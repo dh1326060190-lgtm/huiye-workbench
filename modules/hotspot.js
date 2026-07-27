@@ -243,11 +243,11 @@ const Hotspot = {
           <div class="video-title">${v.title}</div>
           <div class="video-author">${v.avatar} ${v.author} · ${v.publishTime}</div>
           <div class="video-actions">
-            <button class="btn btn-sm btn-primary remix-btn" data-id="${v.id}" onclick="Hotspot.showRemixSuggestion('${v.id}')">💡 二创建议</button>
+            <button class="btn btn-sm btn-primary remix-btn" data-id="${v.id}" onclick="Hotspot.showRemixSuggestion('${v.id}')">二创建议</button>
             <button class="btn btn-sm btn-outline favorite-btn" data-id="${v.id}" onclick="Hotspot.toggleFavorite('${v.id}')">
-              ${isFav ? '⭐ 已收藏' : '☆ 收藏'}
+              ${isFav ? '已收藏' : '收藏'}
             </button>
-            <button class="btn btn-sm btn-outline open-video-btn" data-id="${v.id}" onclick="showToast('🔗 在抖音App中打开...')">🔗 打开</button>
+            <button class="btn btn-sm btn-outline" onclick="Hotspot.openInDouyin('${v.keyword}')">打开抖音</button>
           </div>
           <div id="remix-${v.id}" style="display:none;margin-top:10px;"></div>
         </div>
@@ -324,6 +324,32 @@ const Hotspot = {
     }).catch(() => {
       showToast('复制失败，请手动选择');
     });
+  },
+
+  // 打开抖音搜索
+  openInDouyin(keyword) {
+    const kwMap = {
+      'house': '收房验房',
+      'renovate': '装修改造',
+      'visual': '视觉设计装修',
+      'furniture': '家居好物',
+      'transition': '转场技巧',
+      'unbox': '开箱测评'
+    };
+    const searchWord = kwMap[keyword] || keyword;
+    const url = 'https://www.douyin.com/search/' + encodeURIComponent(searchWord);
+
+    // 尝试唤起抖音 App
+    const schemeUrl = 'snssdk1128://search/' + encodeURIComponent(searchWord);
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = schemeUrl;
+    document.body.appendChild(iframe);
+    setTimeout(() => {
+      document.body.removeChild(iframe);
+      // 如果3秒没唤起App，跳网页版
+      window.open(url, '_blank');
+    }, 3000);
   },
 
   // 获取真实热点数据（预留接口，需后端代理）
