@@ -62,13 +62,7 @@ const App = {
   },
 
   bindNav() {
-    document.querySelectorAll('.nav-item').forEach(item => {
-      item.addEventListener('click', () => {
-        this.switchPage(item.dataset.page);
-      });
-    });
-
-    // 保存按钮已改为 HTML onclick 绑定
+    // 底部导航已改为 HTML onclick="App.switchPage(xxx)" 绑定
     // 弹窗背景关闭保留（点击半透明区域关闭）
     document.getElementById('taskModalOverlay').addEventListener('click', (e) => {
       if (e.target.id === 'taskModalOverlay') Tasks.closeTaskModal();

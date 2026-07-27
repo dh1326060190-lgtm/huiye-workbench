@@ -374,18 +374,27 @@ const Planner = {
     return d.toISOString().split('T')[0];
   },
 
-  // ============ 自动创建关联任务 ============
+  // ============ 自动创建��联任务 ============
   createLinkedTasks(plan) {
     if (!Tasks) return;
 
     const tasks = Store.get(Store.KEYS.TASKS);
     const taskIds = [];
 
-    // 拍摄任务
+    // 拍摄任务 - 详细说明拍什么、怎么拍
+    const shootNoteParts = [];
+    shootNoteParts.push('🎯 选题：' + plan.topic);
+    if (plan.topicSource === 'review') shootNoteParts.push('📊 基于上期复盘优化方向');
+    if (plan.topicSource === 'hotspot') shootNoteParts.push('🔥 参考本周热点趋势');
+    // 提取前2条拍摄要点
+    const shootLines = plan.shootingNotes.split('\n').filter(l => l.trim());
+    if (shootLines.length > 0) shootNoteParts.push('📷 ' + shootLines[0]);
+    if (shootLines.length > 1) shootNoteParts.push('📷 ' + shootLines[1]);
+
     const shootTask = {
       id: Store.genId(),
-      title: '🎬 拍摄：' + plan.topic.substring(0, 30),
-      note: plan.shootingNotes.split('\n').slice(0, 3).join('；'),
+      title: '🎬 拍摄「' + plan.topic.substring(0, 20) + '」',
+      note: shootNoteParts.join('\n'),
       category: 'shoot',
       priority: 'high',
       time: '10:00',
@@ -396,11 +405,18 @@ const Planner = {
     tasks.push(shootTask);
     taskIds.push(shootTask.id);
 
-    // 剪辑任务
+    // 剪辑任务 - 详细说明剪辑技巧和要点
+    const editNoteParts = [];
+    editNoteParts.push('🎬 素材：' + plan.topic);
+    // 提取前3条剪辑要点
+    const editLines = plan.editingNotes.split('\n').filter(l => l.trim() && !l.startsWith('🔥') && !l.startsWith('📋'));
+    editLines.slice(0, 3).forEach(l => editNoteParts.push('✂️ ' + l.replace(/^[·\s\d.]+/, '')));
+    editNoteParts.push('📤 发布日：' + plan.scheduled.publish);
+
     const editTask = {
       id: Store.genId(),
-      title: '✂️ 剪辑：' + plan.topic.substring(0, 30),
-      note: plan.editingNotes.split('\n').slice(0, 3).join('；'),
+      title: '✂️ 剪辑「' + plan.topic.substring(0, 20) + '」',
+      note: editNoteParts.join('\n'),
       category: 'edit',
       priority: 'high',
       time: '14:00',
@@ -411,11 +427,21 @@ const Planner = {
     tasks.push(editTask);
     taskIds.push(editTask.id);
 
-    // 发布任务
+    // 发布任务 - 含发布检查清单
+    const publishNoteParts = [];
+    publishNoteParts.push('📹 视频：「' + plan.topic.substring(0, 25) + '」');
+    publishNoteParts.push('⏰ 最佳发布时间：18:00-21:00');
+    publishNoteParts.push('📋 发布检查清单：');
+    publishNoteParts.push('  □ 封面是否吸引人？');
+    publishNoteParts.push('  □ 标题是否有数字/情绪词？');
+    publishNoteParts.push('  □ 话题标签是否添加（收房/装修/家居）？');
+    publishNoteParts.push('  □ 发布后1小时内回复前10条评论');
+    publishNoteParts.push('💡 发布后记得来「复盘」记录数据');
+
     const publishTask = {
       id: Store.genId(),
-      title: '📤 发布：' + plan.topic.substring(0, 30),
-      note: '建议发布时间 18:00-21:00',
+      title: '📤 发布「' + plan.topic.substring(0, 20) + '」',
+      note: publishNoteParts.join('\n'),
       category: 'publish',
       priority: 'high',
       time: '19:00',

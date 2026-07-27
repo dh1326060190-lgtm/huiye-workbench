@@ -191,6 +191,11 @@ body {
   cursor: pointer;
   transition: color 0.2s;
   position: relative;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  min-height: 52px;
 }
 
 .nav-item .nav-icon {
