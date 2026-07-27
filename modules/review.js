@@ -200,16 +200,33 @@ const Review = {
     showToast('🔍 正在加载识别引擎...');
 
     try {
-      // 动态加载 Tesseract.js（首次加载约需下载语言包）
+      // 动态加载 Tesseract.js，多 CDN 源自动切换
       if (!window.Tesseract) {
         showToast('📦 首次使用需下载中文语言包（约10MB），请稍候...');
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-        await new Promise((resolve, reject) => {
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
+        const urls = [
+          'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js',
+          'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
+          'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.0/tesseract.min.js'
+        ];
+        let loaded = false;
+        for (const url of urls) {
+          try {
+            await new Promise((resolve, reject) => {
+              const script = document.createElement('script');
+              script.src = url;
+              script.onload = resolve;
+              script.onerror = () => reject(new Error('CDN load failed'));
+              document.head.appendChild(script);
+              setTimeout(() => reject(new Error('timeout')), 15000);
+            });
+            loaded = true;
+            console.log('[OCR] Tesseract 加载成功:', url);
+            break;
+          } catch (e) {
+            console.warn('[OCR] CDN 加载失败:', url, e.message);
+          }
+        }
+        if (!loaded) throw new Error('所有 CDN 源加载失败，请检查网络');
       }
 
       showToast('🔍 正在识别截图中的数字...');
@@ -221,8 +238,7 @@ const Review = {
       const result = await Tesseract.recognize(imageUrl, 'chi_sim', {
         logger: (m) => {
           if (m.status === 'recognizing text') {
-            const progress = Math.round(m.progress * 100);
-            // 只在进度变化较大时更新
+            showToast('🔍 识别中 ' + Math.round(m.progress * 100) + '%...');
           }
         }
       });
@@ -235,15 +251,35 @@ const Review = {
 
       const data = this.parseScreenshotData(text);
 
+      // 显示截图预览，方便对照输入
+      const preview = document.getElementById('screenshotPreview');
+      const img = document.getElementById('screenshotImg');
+      img.src = imageUrl;
+      preview.style.display = 'block';
+      document.getElementById('uploadIcon').textContent = '✅';
+      document.getElementById('uploadText').innerHTML = '截图已上传<br><small>下方可对照手动输入</small>';
+
       document.getElementById('dataViews').value = data.views;
       document.getElementById('dataLikes').value = data.likes;
       document.getElementById('dataComments').value = data.comments;
       document.getElementById('dataShares').value = data.shares;
 
-      showToast('✅ 识别完成！请核对数字是否准确，可手动修改');
+      const hasData = data.views > 0 || data.likes > 0;
+      showToast(hasData ? '✅ 识别完成！请核对数字，可手动修改' : '⚠️ 未能自动识别数字，请对照截图手动输入');
     } catch (err) {
       console.error('[OCR] 识别失败:', err);
-      showToast('⚠️ 自动识别失败，请手动输入数据');
+      // OCR 失败时至少显示截图预览
+      const file = document.getElementById('screenshotInput').files[0];
+      if (file) {
+        const fallbackUrl = URL.createObjectURL(file);
+        const preview = document.getElementById('screenshotPreview');
+        const img = document.getElementById('screenshotImg');
+        img.src = fallbackUrl;
+        preview.style.display = 'block';
+        document.getElementById('uploadIcon').textContent = '📸';
+        document.getElementById('uploadText').innerHTML = '截图已上传<br><small>请对照下方手动输入数据</small>';
+      }
+      showToast('⚠️ 自动识别暂不可用，请对照截图手动输入');
     }
   },
 

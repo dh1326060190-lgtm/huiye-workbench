@@ -256,9 +256,13 @@
 
         <!-- 截图上传 -->
         <div class="upload-area" id="screenshotUpload" onclick="document.getElementById('screenshotInput').click()" style="margin-bottom:12px;">
-          <div class="upload-icon">📸</div>
-          <div class="upload-text">上传抖音主页截图<br>自动识别互动数据</div>
+          <div class="upload-icon" id="uploadIcon">📸</div>
+          <div class="upload-text" id="uploadText">上传抖音主页截图<br>自动识别互动数据</div>
           <input type="file" id="screenshotInput" accept="image/*" style="display:none;" onchange="Review.handleScreenshot(event)">
+        </div>
+        <!-- 截图预览 -->
+        <div id="screenshotPreview" style="display:none;margin-bottom:12px;text-align:center;">
+          <img id="screenshotImg" style="max-width:100%;max-height:300px;border-radius:8px;border:1px solid var(--border);">
         </div>
 
         <div class="form-row" style="grid-template-columns:repeat(2,1fr);display:grid;gap:12px;">
