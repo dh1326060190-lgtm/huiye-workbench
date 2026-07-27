@@ -1,70 +1,81 @@
 // ============================================
-// ç»˜é‡å·¥ä½œå° - å†…å®¹å¤ç›˜æ¨¡å— v2
-// æç®€å½•å…¥ + æ™ºèƒ½æ•°æ®åˆ†æ
+// »æÒ°¹¤×÷Ì¨ - ÄÚÈİ¸´ÅÌÄ£¿é v3
+// Á´½Ó·ÖÎö + Êı¾İÕï¶Ï + AIÓÅ»¯½¨Òé
 // ============================================
 
 const Review = {
   currentReview: null,
-  autoAnalyze: null, // å®æ—¶åˆ†æç»“æœ
+  autoAnalyze: null,
 
   init() {
     this.renderList();
   },
 
-  // ========== æ¸²æŸ“å¤ç›˜åˆ—è¡¨ ==========
+  // ========== ´ÓÁ´½ÓÌáÈ¡ĞÅÏ¢ ==========
+  extractFromLink() {
+    const link = document.getElementById('videoLink').value.trim();
+    if (!link) return;
+
+    // ÌáÈ¡¶¶Òô±êÌâ£¨´Ó·ÖÏíÎÄ°¸ÖĞ£©
+    const titleMatch = link.match(/¶¶Òô£¬¿´¿´(.+?)µÄ×÷Æ·/);
+    if (titleMatch) {
+      // ÌáÈ¡×÷Æ·ÃèÊö
+    }
+
+    // ´Ó·ÖÏíÎÄ°¸ÌáÈ¡±êÌâ
+    const descMatch = link.match(/¿´¿´[^µÄ]*µÄ×÷Æ·[£º:]*\s*(.+?)\s*#/);
+    if (descMatch) {
+      document.getElementById('videoTitle').value = descMatch[1].trim();
+      showToast('? ÒÑÌáÈ¡ÊÓÆµ±êÌâ');
+    }
+
+    // ÅĞ¶ÏÆ½Ì¨
+    if (link.includes('douyin.com') || link.includes('v.douyin')) {
+      document.getElementById('reviewPlatform').value = 'douyin';
+    } else if (link.includes('xiaohongshu') || link.includes('xhslink')) {
+      document.getElementById('reviewPlatform').value = 'xiaohongshu';
+    }
+  },
+
+  // ========== äÖÈ¾¸´ÅÌÁĞ±í ==========
   renderList() {
     const container = document.getElementById('reviewList');
     const reviews = Store.get(Store.KEYS.REVIEWS);
 
     if (reviews.length === 0) {
-      container.innerHTML = `<div class="empty-state"><div class="emoji">ğŸ“Š</div><div class="text">è¿˜æ²¡æœ‰å¤ç›˜è®°å½•<br>å‘å¸ƒåèŠ±30ç§’å¤ç›˜ï¼Œæ•°æ®ä¼šå‘Šè¯‰ä½ å¦‚ä½•ä¼˜åŒ–</div></div>`;
+      container.innerHTML = `<div class="empty-state"><div class="emoji">?</div><div class="text">»¹Ã»ÓĞ¸´ÅÌ¼ÇÂ¼<br>Õ³ÌùÊÓÆµÁ´½Ó+ÊäÈëÊı¾İ£¬Ãë³ö·ÖÎö±¨¸æ</div></div>`;
       return;
     }
 
     reviews.sort((a, b) => b.createdAt - a.createdAt);
-
-    // è¶‹åŠ¿æ¦‚è¦
-    let trendHtml = this.renderTrend(reviews);
-    container.innerHTML = trendHtml + reviews.map(r => this.renderReviewCard(r)).join('');
+    let html = this.renderTrend(reviews);
+    html += reviews.map(r => this.renderReviewCard(r)).join('');
+    container.innerHTML = html;
   },
 
-  // è¶‹åŠ¿æ¦‚è¦
+  // ========== Ç÷ÊÆÍ¼ ==========
   renderTrend(reviews) {
-    const recent = reviews.slice(0, 7).reverse(); // æœ€è¿‘7æ¡ï¼Œæ—¶é—´æ­£åº
+    const recent = reviews.slice(0, 7).reverse();
     if (recent.length < 2) return '';
 
     const totalViews = recent.reduce((s, r) => s + (r.data?.views || 0), 0);
     const avgViews = Math.round(totalViews / recent.length);
     const totalLikes = recent.reduce((s, r) => s + (r.data?.likes || 0), 0);
     const avgLikeRate = totalViews > 0 ? (totalLikes / totalViews * 100).toFixed(1) : '0';
-
     const maxBar = Math.max(...recent.map(r => r.data?.views || 0), 1);
 
     return `
       <div class="card" style="margin-bottom:16px;">
         <div class="card-header">
-          <span class="card-title">ğŸ“ˆ è¿‘7æ¡è¶‹åŠ¿</span>
-          <span style="font-size:12px;color:var(--text-muted);">å…±${reviews.length}æ¡å¤ç›˜</span>
+          <span class="card-title">? ½ü7ÌõÇ÷ÊÆ</span>
+          <span style="font-size:12px;color:var(--text-muted);">¹²${reviews.length}Ìõ</span>
         </div>
         <div class="data-grid" style="margin-bottom:12px;">
-          <div class="data-item">
-            <div class="data-num">${Store.formatNum(avgViews)}</div>
-            <div class="data-label">å‡æ’­æ”¾</div>
-          </div>
-          <div class="data-item">
-            <div class="data-num">${avgLikeRate}%</div>
-            <div class="data-label">å‡ç‚¹èµç‡</div>
-          </div>
-          <div class="data-item">
-            <div class="data-num">${reviews.filter(r => (r.data?.views||0) > avgViews).length}/${recent.length}</div>
-            <div class="data-label">é«˜äºå‡å€¼</div>
-          </div>
-          <div class="data-item">
-            <div class="data-num">${recent.length}</div>
-            <div class="data-label">æ€»ä½œå“</div>
-          </div>
+          <div class="data-item"><div class="data-num">${Store.formatNum(avgViews)}</div><div class="data-label">¾ù²¥·Å</div></div>
+          <div class="data-item"><div class="data-num">${avgLikeRate}%</div><div class="data-label">¾ùµãÔŞÂÊ</div></div>
+          <div class="data-item"><div class="data-num">${reviews.filter(r => (r.data?.views||0) > avgViews).length}/${recent.length}</div><div class="data-label">¸ßÓÚ¾ùÖµ</div></div>
+          <div class="data-item"><div class="data-num">${recent.length}</div><div class="data-label">×Ü×÷Æ·</div></div>
         </div>
-        <!-- ç®€æ˜“æŸ±çŠ¶å›¾ -->
         <div style="display:flex;align-items:flex-end;gap:4px;height:60px;padding:0 4px;">
           ${recent.map(r => {
             const h = Math.max((r.data?.views || 0) / maxBar * 100, 4);
@@ -72,29 +83,26 @@ const Review = {
             return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">
               <div style="font-size:9px;color:var(--text-muted);">${Store.formatNum(r.data?.views||0)}</div>
               <div style="width:100%;height:${h}%;background:${color};border-radius:3px 3px 0 0;min-height:4px;"></div>
-              <div style="font-size:9px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40px;">${Store.formatTime(r.createdAt)}</div>
+              <div style="font-size:9px;color:var(--text-muted);max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${Store.formatTime(r.createdAt)}</div>
             </div>`;
           }).join('')}
         </div>
-      </div>
-    `;
+      </div>`;
   },
 
-  // æ¸²æŸ“å¤ç›˜å¡ç‰‡
+  // ========== äÖÈ¾¸´ÅÌ¿¨Æ¬£¨º¬ÍêÕûAI·ÖÎö£© ==========
   renderReviewCard(r) {
     const data = r.data || {};
-    const analysis = this.analyze(data);
-    const rateColor = (v, g, b) => v >= g ? 'var(--success)' : v >= b ? 'var(--warning)' : 'var(--danger)';
+    const analysis = this.analyze(data, r.videoTitle || '');
 
     return `
       <div class="review-card">
         <div class="review-header">
           <div style="flex:1;min-width:0;">
-            <div class="review-title">${this.escape(r.videoTitle || 'æœªå‘½å')}</div>
+            <div class="review-title">${this.escape(r.videoTitle || 'Î´ÃüÃû')}</div>
             <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">
-              ${r.platform === 'douyin' ? 'ğŸµ æŠ–éŸ³' : r.platform === 'xiaohongshu' ? 'ğŸ“• å°çº¢ä¹¦' : 'ğŸ“± å…¶ä»–'}
-              Â· ${Store.formatTime(r.createdAt)}
-              ${r.publishTime ? ' Â· â° ' + r.publishTime : ''}
+              ${r.platform === 'douyin' ? '? ¶¶Òô' : r.platform === 'xiaohongshu' ? '? Ğ¡ºìÊé' : '? ÆäËû'}
+              ¡¤ ${Store.formatTime(r.createdAt)}
             </div>
           </div>
           <div style="text-align:center;flex-shrink:0;">
@@ -104,41 +112,28 @@ const Review = {
         </div>
 
         <div class="data-grid">
-          <div class="data-item">
-            <div class="data-num">${Store.formatNum(data.views || 0)}</div>
-            <div class="data-label">æ’­æ”¾</div>
-          </div>
-          <div class="data-item">
-            <div class="data-num" style="color:${rateColor(analysis.likeRate, 5, 3)}">${analysis.likeRate}%</div>
-            <div class="data-label">ç‚¹èµç‡</div>
-          </div>
-          <div class="data-item">
-            <div class="data-num" style="color:${rateColor(analysis.commentRate, 1, 0.5)}">${analysis.commentRate}%</div>
-            <div class="data-label">è¯„è®ºç‡</div>
-          </div>
-          <div class="data-item">
-            <div class="data-num">${Store.formatNum(data.shares || 0)}</div>
-            <div class="data-label">è½¬å‘</div>
-          </div>
+          <div class="data-item"><div class="data-num">${Store.formatNum(data.views || 0)}</div><div class="data-label">²¥·Å</div></div>
+          <div class="data-item"><div class="data-num" style="color:${analysis.likeRate >= 5 ? 'var(--success)' : analysis.likeRate >= 3 ? 'var(--warning)' : 'var(--danger)'}">${analysis.likeRate}%</div><div class="data-label">µãÔŞÂÊ</div></div>
+          <div class="data-item"><div class="data-num" style="color:${analysis.commentRate >= 1 ? 'var(--success)' : 'var(--warning)'}">${analysis.commentRate}%</div><div class="data-label">ÆÀÂÛÂÊ</div></div>
+          <div class="data-item"><div class="data-num">${Store.formatNum(data.shares || 0)}</div><div class="data-label">×ª·¢</div></div>
         </div>
 
-        ${r.note ? `<div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:8px;">ğŸ“ ${this.escape(r.note)}</div>` : ''}
+        ${r.note ? `<div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:8px;">? ${this.escape(r.note)}</div>` : ''}
 
         <div class="optimization-box">
-          <div class="opt-title">âš¡ æ•°æ®åˆ†æ</div>
-          <div class="opt-content">${analysis.advice}</div>
+          <div class="opt-title">? AI·ÖÎö±¨¸æ</div>
+          <div class="opt-content">${analysis.report}</div>
         </div>
 
         <div style="display:flex;gap:8px;margin-top:10px;">
-          <button class="btn btn-sm btn-outline" onclick="Review.openReviewModal('${r.id}')">âœï¸ ç¼–è¾‘</button>
-          <button class="btn btn-sm btn-outline" onclick="Review.deleteReview('${r.id}')">ğŸ—‘ åˆ é™¤</button>
+          <button class="btn btn-sm btn-outline" onclick="Review.openReviewModal('${r.id}')">?? ±à¼­</button>
+          <button class="btn btn-sm btn-outline" onclick="Review.deleteReview('${r.id}')">? É¾³ı</button>
         </div>
-      </div>
-    `;
+      </div>`;
   },
 
-  // ========== æ•°æ®åˆ†æå¼•æ“ ==========
-  analyze(data) {
+  // ========== AI·ÖÎöÒıÇæ ==========
+  analyze(data, title) {
     const views = data.views || 0;
     const likes = data.likes || 0;
     const comments = data.comments || 0;
@@ -150,51 +145,156 @@ const Review = {
     const engagement = likeRate + commentRate * 3 + shareRate * 2;
 
     let grade, label;
-    if (engagement >= 8) { grade = 'A'; label = 'ä¼˜è´¨'; }
-    else if (engagement >= 5) { grade = 'B'; label = 'è‰¯å¥½'; }
-    else if (engagement >= 2) { grade = 'C'; label = 'ä¸€èˆ¬'; }
-    else { grade = 'D'; label = 'å¾…æå‡'; }
+    if (engagement >= 8) { grade = 'A'; label = 'ÓÅÖÊ'; }
+    else if (engagement >= 5) { grade = 'B'; label = 'Á¼ºÃ'; }
+    else if (engagement >= 2) { grade = 'C'; label = 'Ò»°ã'; }
+    else { grade = 'D'; label = '´ıÌáÉı'; }
 
-    const advices = [];
+    // Éú³ÉÍêÕû·ÖÎö±¨¸æ
+    const parts = [];
+
+    // 1. Êı¾İÕï¶Ï
+    parts.push('<strong>? Êı¾İÕï¶Ï</strong>');
     if (views === 0) {
-      advices.push('æš‚æ— æ’­æ”¾æ•°æ®');
+      parts.push('ÔİÎŞ²¥·ÅÊı¾İ');
     } else {
-      if (likeRate < 3) advices.push(`ç‚¹èµç‡${likeRate}%åä½ï¼ˆç›®æ ‡>5%ï¼‰ã€‚å»ºè®®åŠ å¼ºå†…å®¹ä»·å€¼æ„Ÿï¼šåœ¨è§†é¢‘ä¸­ç»™å‡º"é©¬ä¸Šèƒ½ç”¨çš„å¹²è´§"æˆ–"å¼ºçƒˆçš„æƒ…ç»ªå…±é¸£"ã€‚`);
-      else if (likeRate >= 5) advices.push(`ç‚¹èµç‡${likeRate}%ä¸é”™ï¼ç»§ç»­ä¿æŒè¿™ç§å†…å®¹é£æ ¼ã€‚`);
-      else advices.push(`ç‚¹èµç‡${likeRate}%ä¸­ç­‰ï¼Œæœ‰æå‡ç©ºé—´ã€‚å°è¯•åœ¨å†…å®¹ä¸­åŠ å…¥"åå¸¸è¯†"æˆ–"å¼ºçƒˆå¯¹æ¯”"å…ƒç´ æ¿€å‘ç‚¹èµæ¬²ã€‚`);
+      if (likeRate < 3) parts.push(`µãÔŞÂÊ <b style="color:var(--danger)">${likeRate}%</b>£¨Ä¿±ê>5%£©¡ª¡ª ¹ÛÖÚ¿´ÁËµ«Ã»±»´ò¶¯£¬È±ÉÙÇéĞ÷¹²Ãù»òÊµÓÃ¸É»õ`);
+      else if (likeRate >= 5) parts.push(`µãÔŞÂÊ <b style="color:var(--success)">${likeRate}%</b> ´ï±ê£¡ÄÚÈİ¼ÛÖµ¸ĞÊÜµ½ÈÏ¿É`);
+      else parts.push(`µãÔŞÂÊ <b style="color:var(--warning)">${likeRate}%</b> ÖĞµÈ£¬ÊÔÊÔ¼ÓÈë"·´³£Ê¶"»ò"Ç¿ÁÒ¶Ô±È"¼¤·¢µãÔŞÓû`);
 
-      if (commentRate < 0.5) advices.push(`è¯„è®ºç‡${commentRate}%åä½ï¼ˆç›®æ ‡>1%ï¼‰ã€‚è¯•è¯•ç»“å°¾åŠ ä¸€å¥äº‰è®®æ€§æé—®æˆ–"è¯„è®ºåŒºå‘Šè¯‰æˆ‘..."å¼•å¯¼äº’åŠ¨ã€‚`);
-      else if (commentRate >= 1) advices.push(`è¯„è®ºç‡${commentRate}%è¡¨ç°å¥½ï¼è¯´æ˜å†…å®¹å¼•å‘äº†è®¨è®ºï¼Œç»§ç»­ä¿æŒäº’åŠ¨å¼•å¯¼ã€‚`);
+      if (commentRate < 0.5) parts.push(`ÆÀÂÛÂÊ <b style="color:var(--danger)">${commentRate}%</b>£¨Ä¿±ê>1%£©¡ª¡ª ½áÎ²Ã»ÓĞÓĞĞ§»¥¶¯Òıµ¼`);
+      else if (commentRate >= 1) parts.push(`ÆÀÂÛÂÊ <b style="color:var(--success)">${commentRate}%</b> ´ï±ê£¡ÄÚÈİÒı·¢ÁËÌÖÂÛ`);
 
-      if (shareRate > 0.5) advices.push(`è½¬å‘ç‡é«˜è¯´æ˜å†…å®¹æœ‰æ”¶è—/åˆ†äº«ä»·å€¼ï¼Œè¿™ç±»"æœ‰ç”¨"çš„å†…å®¹å»ºè®®å¤šåšã€‚`);
-      if (shares === 0 && views > 500) advices.push('è½¬å‘ä¸º0ï¼Œå†…å®¹ç¼ºå°‘"å€¼å¾—åˆ†äº«"çš„ä»·å€¼ç‚¹ã€‚è€ƒè™‘åŠ å…¥"è½¬å‘ç»™æ­£åœ¨è£…ä¿®çš„æœ‹å‹"ç­‰å¼•å¯¼ã€‚');
-
-      // ç»¼åˆå»ºè®®
-      if (engagement < 3) {
-        advices.push('æ•´ä½“äº’åŠ¨åä½ï¼Œå»ºè®®å›é¡¾ï¼š1ï¼‰å‰3ç§’æ˜¯å¦æŠ“äºº 2ï¼‰ä¸­é—´æ˜¯å¦æœ‰ä¿¡æ¯å¯†åº¦ 3ï¼‰ç»“å°¾æ˜¯å¦æœ‰æ˜ç¡®CTAã€‚');
-      }
+      if (shareRate < 0.3) parts.push(`×ª·¢ÂÊ <b style="color:var(--warning)">${shareRate}%</b> Æ«µÍ ¡ª¡ª ÄÚÈİÈ±ÉÙ"×ª·¢¸øÅóÓÑ"µÄ¼ÛÖµ¸Ğ`);
     }
+
+    // 2. ±êÌâÕï¶Ï
+    parts.push('<br><strong>? ±êÌâÕï¶Ï</strong>');
+    const titleAnalysis = this.analyzeTitle(title);
+    parts.push(titleAnalysis);
+
+    // 3. ¾ßÌåÓÅ»¯·½°¸
+    parts.push('<br><strong>? ÏÂ´ÎÓÅ»¯·½°¸</strong>');
+    const optPlan = this.generateOptimizationPlan(data, title);
+    parts.push(optPlan);
 
     return {
       likeRate, commentRate, shareRate, engagement,
       grade, label,
-      advice: advices.length > 0 ? advices.map((a, i) => `${i + 1}. ${a}`).join('<br>') : 'âœ… æ•°æ®è¡¨ç°ä¸é”™ï¼Œç»§ç»­ä¿æŒï¼'
+      advice: parts.join('<br>'),
+      report: parts.join('<br>')
     };
   },
 
-  // ========== å¼¹çª—ï¼šæç®€å½•å…¥ ==========
+  // ========== ±êÌâ·ÖÎö ==========
+  analyzeTitle(title) {
+    if (!title) return 'Î´Ìá¹©±êÌâ';
+
+    const issues = [];
+    const goods = [];
+
+    // ¼ì²éÊÇ·ñÓĞÊı×Ö
+    if (/\d/.test(title)) goods.push('? °üº¬Êı×Ö£¬ÔöÇ¿¿ÉĞÅ¶È');
+    else issues.push('? È±ÉÙ¾ßÌåÊı×Ö£¬½¨Òé¼ÓÈëÈç¡¸3¸ö·½·¨¡¹¡¸7¸öÏ¸½Ú¡¹');
+
+    // ¼ì²éÊÇ·ñÓĞÇéĞ÷´Ê
+    const emotionWords = /Ç§Íò±ğ|±Ø¿´|ºó»Ú|¿ŞÁË|¾øÁË|Õğ¾ª|¾ÈÃü|Ë­¶®|ÖÕÓÚ|²îµã|¿÷ÁË/;
+    if (emotionWords.test(title)) goods.push('? ÓĞÇéĞ÷¹³×Ó');
+    else issues.push('? È±ÉÙÇéĞ÷´Ê£¬½¨Òé¼ÓÈë¡¸Ç§Íò±ğ¡¹¡¸ºó»Ú¡¹¡¸²îµã¡¹µÈ');
+
+    // ¼ì²éÊÇ·ñÓĞĞüÄî
+    const suspense = /Õâ¸ö|µÚ.*¸ö|¾¹È»|Ã»Ïëµ½|Ô­À´|ÆäÊµ/;
+    if (suspense.test(title)) goods.push('? ÓĞĞüÄîÒıµ¼');
+    else issues.push('? ¿É¼ÓÈë¡¸µÚX¸ö×î¿Ó¡¹ÖÆÔìºÃÆæÈ±¿Ú');
+
+    // ¼ì²é³¤¶È
+    if (title.length > 30) issues.push('?? ±êÌâÆ«³¤£¨>30×Ö£©£¬½¨Òé¾«¼òµ½20×ÖÒÔÄÚ');
+    else if (title.length < 10) issues.push('?? ±êÌâÆ«¶Ì£¬ĞÅÏ¢Á¿²»×ã');
+
+    return [...goods, ...issues].join('<br>');
+  },
+
+  // ========== ÓÅ»¯·½°¸Éú³É ==========
+  generateOptimizationPlan(data, title) {
+    const views = data.views || 0;
+    const likes = data.likes || 0;
+    const comments = data.comments || 0;
+    const tips = [];
+
+    // Ç°3Ãë½¨Òé
+    tips.push('¢Ù <b>Ç°3Ãë</b>£º°ÑÊÓÆµÖĞ×îÕğº³µÄ»­Ãæ¼ôµ½¿ªÍ·£¬Åä³åÍ»×ÖÄ»¡£²»ÒªÆÌµæ£¬Ö±½Ó¸ø³åÍ»¡£');
+
+    // ±êÌâ¸ÄĞ´
+    if (title) {
+      const rewritten = this.rewriteTitle(title);
+      tips.push(`¢Ú <b>±êÌâ¸ÄĞ´</b>£ºÊÔÊÔ¡¸${rewritten}¡¹`);
+    }
+
+    // »¥¶¯Òıµ¼
+    if (comments <= 1) {
+      tips.push('¢Û <b>»¥¶¯Òıµ¼</b>£º½áÎ²¼Ó¡¸ÄãÃÇÓöµ½¹ıÂğ£¿ÆÀÂÛÇøËµËµ¡¹±ÈÇóÔŞÓĞĞ§3±¶¡£·¢²¼ºó×Ô¼ºÏÈÆÀÂÛÒ»Ìõ´ø½Ú×à¡£');
+    }
+
+    // ÏµÁĞ»¯½¨Òé
+    if (title && (title.includes('ÊÕ·¿') || title.includes('Ñé·¿'))) {
+      tips.push('¢Ü <b>ÏµÁĞ»¯</b>£ºÕâÌõ¿ÉÒÔ×ö³É¡¸ÊÕ·¿±Ü¿Ó¡¹ÏµÁĞ EP.01£¬Ã¿ÆÚÒ»¸öÖ÷Ìâ£¨¿Õ¹Ä/ÉøË®/ÃÅ´°/µçÂ·£©£¬½¨Á¢×·¸üÔ¤ÆÚ¡£');
+    }
+
+    // ·âÃæ½¨Òé
+    tips.push('¢İ <b>·âÃæ</b>£º´ó×Ö±êÌâÕ¼»­Ãæ1/4ÒÔÉÏ£¬ÓÃ¶Ô±ÈÉ«Ãè±ß£¬ÊÖ»úĞ¡Í¼Ò²ÄÜ¿´Çå¡£');
+
+    // ·¢²¼Ê±¼ä
+    tips.push('¢Ş <b>·¢²¼Ê±¼ä</b>£º½¨ÒéÍí 18:00-21:00 ·¢²¼£¬Õâ¸öÊ±¶Î¼Ò¾ÓÀàÄÚÈİ´ò¿ªÂÊ×î¸ß¡£');
+
+    return tips.join('<br>');
+  },
+
+  // ========== ±êÌâ¸ÄĞ´ÒıÇæ ==========
+  rewriteTitle(title) {
+    // »ùÓÚÕËºÅ¶¨Î»µÄ±êÌâÓÅ»¯
+    const patterns = [
+      { regex: /ÊÕ·¿/, replacement: 'ÊÕ·¿' },
+      { regex: /Ñé·¿/, replacement: 'Ñé·¿' },
+      { regex: /Ç§Íò±ğ/, replacement: 'Ç§Íò±ğ' },
+      { regex: /±Ü¿Ó/, replacement: '±Ü¿Ó' },
+    ];
+
+    // Ìí¼ÓÊı×Ö¹³×Ó
+    if (!/\d/.test(title)) {
+      if (title.includes('ÊÕ·¿')) {
+        return title.replace('ÊÕ·¿', 'ÊÕ·¿±Ø²éµÄ5¸öµØ·½') + '£¬µÚ3¸ö×îÈİÒ×±»¿Ó';
+      }
+      if (title.includes('Ñé·¿')) {
+        return title.replace('Ñé·¿', 'Ñé·¿Ê¦½ÌµÄ7¸öÏ¸½Ú') + '£¬¿ª·¢ÉÌ×îÅÂÄã²é';
+      }
+      return '90%µÄÈË¶¼²»ÖªµÀ£º' + title;
+    }
+
+    // ¼ÓÇéĞ÷¹³×Ó
+    if (!/Ç§Íò±ğ|ºó»Ú|²îµã|¿÷ÁË/.test(title)) {
+      return title.replace(/£¡|¡£|$/, '£¬²îµã¿÷ÁË2Íò£¡');
+    }
+
+    // ¼ÓÏµÁĞ±àºÅ
+    if (!/EP|µÚ.*ÆÚ/.test(title)) {
+      return '¡¾EP.01¡¿' + title;
+    }
+
+    return title;
+  },
+
+  // ========== µ¯´° ==========
   openReviewModal(reviewId = null) {
     const overlay = document.getElementById('reviewModalOverlay');
-    this.currentReview = { scores: {} };
-    this.autoAnalyze = null;
 
     if (reviewId) {
       const reviews = Store.get(Store.KEYS.REVIEWS);
       const r = reviews.find(rr => rr.id === reviewId);
       if (!r) return;
-      document.getElementById('reviewModalTitle').textContent = 'ç¼–è¾‘å¤ç›˜';
+      document.getElementById('reviewModalTitle').textContent = '±à¼­¸´ÅÌ';
       document.getElementById('reviewId').value = r.id;
       document.getElementById('videoTitle').value = r.videoTitle || '';
+      document.getElementById('videoLink').value = r.videoLink || '';
       document.getElementById('reviewPlatform').value = r.platform || 'douyin';
       document.getElementById('reviewNote').value = r.note || '';
       document.getElementById('dataViews').value = r.data?.views || '';
@@ -203,21 +303,20 @@ const Review = {
       document.getElementById('dataShares').value = r.data?.shares || '';
       document.getElementById('publishTime').value = r.publishTime || '';
       this.currentReview = r;
-      this.autoAnalyze = this.analyze(r.data || {});
+      this.autoAnalyze = this.analyze(r.data || {}, r.videoTitle || '');
     } else {
-      document.getElementById('reviewModalTitle').textContent = 'âš¡ å¿«é€Ÿå¤ç›˜';
+      document.getElementById('reviewModalTitle').textContent = '? ĞÂ½¨¸´ÅÌ';
       document.getElementById('reviewId').value = '';
       document.getElementById('reviewForm').reset();
       document.getElementById('reviewPlatform').value = 'douyin';
+      this.currentReview = null;
+      this.autoAnalyze = null;
     }
 
-    // æ¸…é™¤å®æ—¶é¢„è§ˆ
     document.getElementById('liveAnalysis').innerHTML = '';
     document.getElementById('liveAnalysis').style.display = 'none';
 
     overlay.classList.add('active');
-
-    // ç»‘å®šå®æ—¶è¾“å…¥åˆ†æ
     this.bindLiveInput();
   },
 
@@ -227,9 +326,8 @@ const Review = {
     this.autoAnalyze = null;
   },
 
-  // å®æ—¶è¾“å…¥åˆ†æï¼šè¾“å…¥æ•°å­—åå³æ—¶æ˜¾ç¤ºåˆ†æç»“æœ
+  // ========== ÊµÊ±ÊäÈë·ÖÎö ==========
   bindLiveInput() {
-    const inputs = ['dataViews', 'dataLikes', 'dataComments', 'dataShares'];
     const handler = () => {
       const data = {
         views: parseInt(document.getElementById('dataViews').value) || 0,
@@ -237,24 +335,27 @@ const Review = {
         comments: parseInt(document.getElementById('dataComments').value) || 0,
         shares: parseInt(document.getElementById('dataShares').value) || 0
       };
+      const title = document.getElementById('videoTitle').value.trim();
+
       if (data.views > 0 || data.likes > 0) {
-        this.autoAnalyze = this.analyze(data);
+        this.autoAnalyze = this.analyze(data, title);
         const el = document.getElementById('liveAnalysis');
         el.style.display = 'block';
         el.innerHTML = `
           <div class="optimization-box">
-            <div class="opt-title">ğŸ“Š å®æ—¶åˆ†æ <span class="tag tag-accent">${this.autoAnalyze.grade}çº§</span></div>
+            <div class="opt-title">? ÊµÊ±·ÖÎö <span class="tag tag-accent">${this.autoAnalyze.grade}¼¶</span></div>
             <div style="display:flex;gap:16px;margin:8px 0;font-size:13px;">
-              <span>ğŸ‘ ç‚¹èµç‡ <b style="color:${this.autoAnalyze.likeRate >= 5 ? 'var(--success)' : this.autoAnalyze.likeRate >= 3 ? 'var(--warning)' : 'var(--danger)'}">${this.autoAnalyze.likeRate}%</b></span>
-              <span>ğŸ’¬ è¯„è®ºç‡ <b style="color:${this.autoAnalyze.commentRate >= 1 ? 'var(--success)' : 'var(--warning)'}">${this.autoAnalyze.commentRate}%</b></span>
-              <span>ğŸ”— äº’åŠ¨åˆ† <b>${this.autoAnalyze.engagement.toFixed(1)}</b></span>
+              <span>? µãÔŞÂÊ <b style="color:${this.autoAnalyze.likeRate >= 5 ? 'var(--success)' : this.autoAnalyze.likeRate >= 3 ? 'var(--warning)' : 'var(--danger)'}">${this.autoAnalyze.likeRate}%</b></span>
+              <span>? ÆÀÂÛÂÊ <b style="color:${this.autoAnalyze.commentRate >= 1 ? 'var(--success)' : 'var(--warning)'}">${this.autoAnalyze.commentRate}%</b></span>
+              <span>? »¥¶¯·Ö <b>${this.autoAnalyze.engagement.toFixed(1)}</b></span>
             </div>
-            <div class="opt-content">${this.autoAnalyze.advice}</div>
+            <div class="opt-content" style="font-size:12px;line-height:1.8;">${this.autoAnalyze.report}</div>
           </div>
         `;
       }
     };
-    inputs.forEach(id => {
+
+    ['dataViews','dataLikes','dataComments','dataShares','videoTitle'].forEach(id => {
       const el = document.getElementById(id);
       if (el) {
         el.removeEventListener('input', handler);
@@ -263,52 +364,44 @@ const Review = {
     });
   },
 
-  // ========== æ™ºèƒ½ç²˜è´´ ==========
+  // ========== ÖÇÄÜÕ³Ìù ==========
   smartPaste() {
     navigator.clipboard.readText().then(text => {
-      if (!text.trim()) {
-        showToast('ğŸ“‹ å‰ªè´´æ¿ä¸ºç©ºï¼Œè¯·å…ˆä»æŠ–éŸ³å¤åˆ¶ä½œå“æ•°æ®');
-        return;
+      if (!text.trim()) { showToast('? ¼ôÌù°åÎª¿Õ'); return; }
+
+      // ÏÈ³¢ÊÔÌîÈëÁ´½Ó
+      if (text.includes('douyin.com') || text.includes('v.douyin') || text.includes('xiaohongshu')) {
+        document.getElementById('videoLink').value = text.trim();
+        this.extractFromLink();
+        showToast('? ÒÑÊ¶±ğÊÓÆµÁ´½Ó²¢ÌáÈ¡±êÌâ');
       }
-      // å°è¯•è§£æç²˜è´´å†…å®¹ä¸­çš„æ•°å­—
-      const nums = text.match(/\d[\d,.]*[ä¸‡wW]?/g);
+
+      // ÌáÈ¡Êı×Ö
+      const nums = text.match(/\d[\d,.]*[ÍòwW]?/g);
       if (nums && nums.length >= 2) {
         const parsed = nums.map(n => {
           n = n.replace(/,/g, '');
-          if (n.endsWith('ä¸‡') || n.endsWith('w') || n.endsWith('W')) return Math.round(parseFloat(n) * 10000);
+          if (/[ÍòwW]$/.test(n)) return Math.round(parseFloat(n) * 10000);
           return parseInt(n) || 0;
         }).filter(n => n > 0);
-
-        // æŒ‰å¤§å°æ’åºï¼Œæœ€å¤§çš„æ˜¯æ’­æ”¾é‡
         const sorted = [...parsed].sort((a, b) => b - a);
         if (sorted.length >= 4) {
           document.getElementById('dataViews').value = sorted[0];
           document.getElementById('dataLikes').value = sorted[1];
           document.getElementById('dataComments').value = sorted[2];
           document.getElementById('dataShares').value = sorted[3];
-          showToast('âœ… å·²æ™ºèƒ½è§£æå‰ªè´´æ¿æ•°æ®ï¼Œè¯·æ ¸å¯¹');
-          // è§¦å‘å®æ—¶åˆ†æ
           document.getElementById('dataViews').dispatchEvent(new Event('input'));
-        } else if (sorted.length >= 2) {
-          document.getElementById('dataViews').value = sorted[0];
-          document.getElementById('dataLikes').value = sorted[1];
-          showToast('âš ï¸ åªè¯†åˆ«åˆ°éƒ¨åˆ†æ•°æ®ï¼Œè¯·è¡¥å……è¯„è®ºå’Œè½¬å‘æ•°');
-          document.getElementById('dataViews').dispatchEvent(new Event('input'));
-        } else {
-          showToast('âš ï¸ æœªèƒ½è¯†åˆ«æœ‰æ•ˆæ•°å­—ï¼Œè¯·æ‰‹åŠ¨è¾“å…¥');
+          showToast('? ÒÑ×Ô¶¯½âÎö²¥·Å/µãÔŞ/ÆÀÂÛ/×ª·¢');
         }
-      } else {
-        showToast('âš ï¸ å‰ªè´´æ¿å†…å®¹æ— æœ‰æ•ˆæ•°å­—ï¼Œè¯·ä»æŠ–éŸ³ä½œå“è¯¦æƒ…é¡µå¤åˆ¶');
       }
-    }).catch(() => {
-      showToast('âš ï¸ æ— æ³•è¯»å–å‰ªè´´æ¿ï¼Œè¯·æ‰‹åŠ¨è¾“å…¥æ•°æ®');
-    });
+    }).catch(() => showToast('?? ÎŞ·¨¶ÁÈ¡¼ôÌù°å'));
   },
 
-  // ========== ä¿å­˜å¤ç›˜ ==========
+  // ========== ±£´æ ==========
   saveReview() {
     const id = document.getElementById('reviewId').value;
     const title = document.getElementById('videoTitle').value.trim();
+    const link = document.getElementById('videoLink').value.trim();
     const platform = document.getElementById('reviewPlatform').value;
     const note = document.getElementById('reviewNote').value.trim();
     const publishTime = document.getElementById('publishTime').value;
@@ -320,17 +413,17 @@ const Review = {
       shares: parseInt(document.getElementById('dataShares').value) || 0
     };
 
-    // æ— æ ‡é¢˜æ—¶è‡ªåŠ¨ç”Ÿæˆ
-    const finalTitle = title || (platform === 'douyin' ? 'æŠ–éŸ³ä½œå“' : 'å°çº¢ä¹¦ç¬”è®°') + ' Â· ' + Store.today();
-
     if (data.views === 0 && data.likes === 0) {
-      showToast('âš ï¸ è¯·è‡³å°‘è¾“å…¥æ’­æ”¾é‡å’Œç‚¹èµæ•°');
+      showToast('?? ÇëÖÁÉÙÊäÈë²¥·ÅÁ¿ºÍµãÔŞÊı');
       return;
     }
+
+    const finalTitle = title || (platform === 'douyin' ? '¶¶Òô×÷Æ·' : 'Ğ¡ºìÊé±Ê¼Ç');
 
     const reviewData = {
       id: id || Store.genId(),
       videoTitle: finalTitle,
+      videoLink: link,
       platform: platform,
       note: note,
       data: data,
@@ -349,16 +442,16 @@ const Review = {
     Store.set(Store.KEYS.REVIEWS, reviews);
     this.closeReviewModal();
     this.renderList();
-    showToast(id ? 'âœ… å¤ç›˜å·²æ›´æ–°' : 'âœ… å¤ç›˜å·²ä¿å­˜');
+    showToast(id ? '? ¸´ÅÌÒÑ¸üĞÂ' : '? ·ÖÎö±¨¸æÒÑÉú³É');
   },
 
   deleteReview(reviewId) {
-    if (!confirm('ç¡®å®šåˆ é™¤è¿™æ¡å¤ç›˜å—ï¼Ÿ')) return;
+    if (!confirm('È·¶¨É¾³ı£¿')) return;
     let reviews = Store.get(Store.KEYS.REVIEWS);
     reviews = reviews.filter(r => r.id !== reviewId);
     Store.set(Store.KEYS.REVIEWS, reviews);
     this.renderList();
-    showToast('å·²åˆ é™¤');
+    showToast('ÒÑÉ¾³ı');
   },
 
   escape(str) {
@@ -372,11 +465,12 @@ const Review = {
     if (Store.get(Store.KEYS.REVIEWS).length > 0) return;
     Store.set(Store.KEYS.REVIEWS, [{
       id: Store.genId(),
-      videoTitle: 'æ”¶æˆ¿ç¬¬ä¸€å¤©ï½œéªŒæˆ¿å·®ç‚¹è¢«å‘ï¼Œè¿™5ä¸ªåœ°æ–¹ä¸€å®šè¦æŸ¥ï¼',
+      videoTitle: 'ÊÕ·¿Ç§Íò±ğÏÈÇ©×Ö£¡90%µÄÒµÖ÷¶¼²È¹ıÕâ¸ö¿Ó',
+      videoLink: 'https://v.douyin.com/9zSZMLBFJgo/',
       platform: 'douyin',
-      note: 'å‰3ç§’èŠ‚å¥å¯ä»¥æ›´å¿«ï¼Œå°é¢æ–‡å­—å¤ªå°',
-      data: { views: 12300, likes: 680, comments: 45, shares: 32 },
-      publishTime: '18:30',
+      note: 'Ç°3Ãë¿ÉÒÔ¸ü¿ìÇĞÈëÎÊÌâ»­Ãæ',
+      data: { views: 550, likes: 6, comments: 1, shares: 1 },
+      publishTime: '18:00',
       createdAt: Date.now() - 86400000
     }]);
   }

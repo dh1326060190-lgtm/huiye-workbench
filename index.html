@@ -8,10 +8,10 @@
   <meta name="apple-mobile-web-app-title" content="绘野工作台">
   <meta name="theme-color" content="#6c5ce7">
   <meta name="description" content="小赵和小董的视觉新居 - 内容创作工作台">
-  <link rel="manifest" href="./manifest.json?v=4">
-  <link rel="apple-touch-icon" href="./assets/icon-192.svg?v=4">
-  <link rel="icon" type="image/svg+xml" href="./assets/icon-192.svg?v=4">
-  <link rel="stylesheet" href="./styles.css?v=4">
+  <link rel="manifest" href="./manifest.json?v=5">
+  <link rel="apple-touch-icon" href="./assets/icon-192.svg?v=5">
+  <link rel="icon" type="image/svg+xml" href="./assets/icon-192.svg?v=5">
+  <link rel="stylesheet" href="./styles.css?v=5">
   <title>绘野工作台</title>
 </head>
 <body>
@@ -235,9 +235,14 @@
       <form id="reviewForm" onsubmit="return false;">
         <input type="hidden" id="reviewId">
 
-        <button type="button" class="btn btn-outline btn-block" onclick="Review.smartPaste()" style="margin-bottom:12px;">
+        <button type="button" class="btn btn-outline btn-block" onclick="Review.smartPaste()" style="margin-bottom:8px;">
           📋 一键粘贴抖音数据
         </button>
+
+        <div class="form-group">
+          <label>📎 视频链接（粘贴后自动提取标题）</label>
+          <input type="text" class="input" id="videoLink" placeholder="粘贴抖音/小红书分享链接..." onblur="Review.extractFromLink()">
+        </div>
 
         <div class="form-group">
           <label>视频标题（可留空）</label>
@@ -299,11 +304,11 @@
   <div class="toast" id="toast"></div>
 
   <!-- 脚本 -->
-  <script src="./modules/store.js?v=4"></script>
-  <script src="./modules/tasks.js?v=4"></script>
-  <script src="./modules/hotspot.js?v=4"></script>
-  <script src="./modules/review.js?v=4"></script>
-  <script src="./modules/inspiration.js?v=4"></script>
-  <script src="./app.js?v=4"></script>
+  <script src="./modules/store.js?v=5"></script>
+  <script src="./modules/tasks.js?v=5"></script>
+  <script src="./modules/hotspot.js?v=5"></script>
+  <script src="./modules/review.js?v=5"></script>
+  <script src="./modules/inspiration.js?v=5"></script>
+  <script src="./app.js?v=5"></script>
 </body>
 </html>
