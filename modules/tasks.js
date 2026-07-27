@@ -27,21 +27,16 @@ const Tasks = {
   },
 
   bindEvents() {
-    // 添加任务按钮
-    document.getElementById('addTaskBtn').addEventListener('click', () => this.openTaskModal());
+    // 添加/保存/关闭/筛选按钮已改为 HTML onclick 绑定，兼容 OPPO 等国产浏览器
+  },
 
-    // 模态窗关闭
-    document.getElementById('taskModalClose').addEventListener('click', () => this.closeTaskModal());
-
-    // 筛选切换
-    document.querySelectorAll('.task-filter-chip').forEach(chip => {
-      chip.addEventListener('click', (e) => {
-        document.querySelectorAll('.task-filter-chip').forEach(c => c.classList.remove('active'));
-        e.target.classList.add('active');
-        this.currentFilter = e.target.dataset.filter;
-        this.renderList();
-      });
-    });
+  // 设置任务筛选
+  setFilter(filter) {
+    this.currentFilter = filter;
+    document.querySelectorAll('.task-filter-chip').forEach(c => c.classList.remove('active'));
+    const active = document.querySelector(`.task-filter-chip[data-filter="${filter}"]`);
+    if (active) active.classList.add('active');
+    this.renderList();
   },
 
   // 获取今日任务
@@ -104,25 +99,6 @@ const Tasks = {
     }
 
     container.innerHTML = tasks.map(task => this.renderTaskItem(task)).join('');
-
-    // 绑定事件
-    container.querySelectorAll('.task-checkbox').forEach(cb => {
-      cb.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.toggleTask(e.currentTarget.dataset.id);
-      });
-    });
-
-    container.querySelectorAll('.task-item').forEach(item => {
-      item.addEventListener('click', () => this.openTaskModal(item.dataset.id));
-    });
-
-    container.querySelectorAll('.task-delete-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.deleteTask(e.currentTarget.dataset.id);
-      });
-    });
   },
 
   // 渲染单个任务
@@ -131,8 +107,8 @@ const Tasks = {
     const pri = this.PRIORITIES.find(p => p.id === task.priority) || this.PRIORITIES[1];
 
     return `
-      <div class="task-item ${pri.class} ${task.completed ? 'completed' : ''}" data-id="${task.id}">
-        <div class="task-checkbox ${task.completed ? 'checked' : ''}" data-id="${task.id}"></div>
+      <div class="task-item ${pri.class} ${task.completed ? 'completed' : ''}" data-id="${task.id}" onclick="Tasks.openTaskModal('${task.id}')">
+        <div class="task-checkbox ${task.completed ? 'checked' : ''}" data-id="${task.id}" onclick="event.stopPropagation(); Tasks.toggleTask('${task.id}')"></div>
         <div class="task-content">
           <div class="task-title">${this.escape(task.title)}</div>
           ${task.note ? `<div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">${this.escape(task.note)}</div>` : ''}
@@ -142,14 +118,14 @@ const Tasks = {
             ${task.time ? `<span class="tag">⏰ ${task.time}</span>` : ''}
           </div>
         </div>
-        <button class="btn btn-icon task-delete-btn" data-id="${task.id}" style="align-self:flex-start;">🗑</button>
+        <button class="btn btn-icon task-delete-btn" data-id="${task.id}" onclick="event.stopPropagation(); Tasks.deleteTask('${task.id}')" style="align-self:flex-start;">🗑</button>
       </div>
     `;
   },
 
   // 打开任务弹窗（新建/编辑）
   openTaskModal(taskId = null) {
-    const modal = document.getElementById('taskModal');
+    const overlay = document.getElementById('taskModalOverlay');
     const form = document.getElementById('taskForm');
     form.reset();
 
@@ -173,11 +149,11 @@ const Tasks = {
       document.getElementById('taskDate').value = Store.today();
     }
 
-    modal.classList.add('active');
+    overlay.classList.add('active');
   },
 
   closeTaskModal() {
-    document.getElementById('taskModal').classList.remove('active');
+    document.getElementById('taskModalOverlay').classList.remove('active');
   },
 
   // 保存任务

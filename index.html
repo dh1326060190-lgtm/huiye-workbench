@@ -8,10 +8,10 @@
   <meta name="apple-mobile-web-app-title" content="绘野工作台">
   <meta name="theme-color" content="#6c5ce7">
   <meta name="description" content="小赵和小董的视觉新居 - 内容创作工作台">
-  <link rel="manifest" href="./manifest.json">
-  <link rel="apple-touch-icon" href="./assets/icon-192.svg">
-  <link rel="icon" type="image/svg+xml" href="./assets/icon-192.svg">
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="manifest" href="./manifest.json?v=2">
+  <link rel="apple-touch-icon" href="./assets/icon-192.svg?v=2">
+  <link rel="icon" type="image/svg+xml" href="./assets/icon-192.svg?v=2">
+  <link rel="stylesheet" href="./styles.css?v=2">
   <title>绘野工作台</title>
 </head>
 <body>
@@ -62,20 +62,20 @@
 
         <!-- 筛选 -->
         <div class="hot-filter" style="margin-bottom:12px;">
-          <button class="filter-chip task-filter-chip active" data-filter="all">全部</button>
-          <button class="filter-chip task-filter-chip" data-filter="pending">待办</button>
-          <button class="filter-chip task-filter-chip" data-filter="done">已完成</button>
-          <button class="filter-chip task-filter-chip" data-filter="shoot">📷 拍摄</button>
-          <button class="filter-chip task-filter-chip" data-filter="edit">✂️ 剪辑</button>
-          <button class="filter-chip task-filter-chip" data-filter="publish">📤 发布</button>
-          <button class="filter-chip task-filter-chip" data-filter="operate">📊 运营</button>
+          <button class="filter-chip task-filter-chip active" data-filter="all" onclick="Tasks.setFilter('all')">全部</button>
+          <button class="filter-chip task-filter-chip" data-filter="pending" onclick="Tasks.setFilter('pending')">待办</button>
+          <button class="filter-chip task-filter-chip" data-filter="done" onclick="Tasks.setFilter('done')">已完成</button>
+          <button class="filter-chip task-filter-chip" data-filter="shoot" onclick="Tasks.setFilter('shoot')">📷 拍摄</button>
+          <button class="filter-chip task-filter-chip" data-filter="edit" onclick="Tasks.setFilter('edit')">✂️ 剪辑</button>
+          <button class="filter-chip task-filter-chip" data-filter="publish" onclick="Tasks.setFilter('publish')">📤 发布</button>
+          <button class="filter-chip task-filter-chip" data-filter="operate" onclick="Tasks.setFilter('operate')">📊 运营</button>
         </div>
 
         <!-- 任务列表 -->
         <div id="taskList"></div>
 
         <!-- 添加按钮 -->
-        <button class="btn btn-primary btn-block" id="addTaskBtn" style="margin-top:12px;">
+        <button class="btn btn-primary btn-block" id="addTaskBtn" onclick="Tasks.openTaskModal()" style="margin-top:12px;min-height:48px;">
           ➕ 添加新任务
         </button>
       </section>
@@ -85,8 +85,8 @@
         <!-- 搜索栏 -->
         <div class="search-bar">
           <input type="text" class="input" id="hotSearchInput" placeholder="搜索热点视频标题/作者...">
-          <button class="btn btn-primary" id="hotSearchBtn">🔍</button>
-          <button class="btn btn-outline" id="hotRefreshBtn">🔄</button>
+          <button class="btn btn-primary" id="hotSearchBtn" onclick="Hotspot.search()">🔍</button>
+          <button class="btn btn-outline" id="hotRefreshBtn" onclick="Hotspot.refresh()">🔄</button>
         </div>
 
         <!-- 关键词筛选 -->
@@ -115,7 +115,7 @@
         <div id="reviewList"></div>
 
         <!-- 添加按钮 -->
-        <button class="btn btn-primary btn-block" id="addReviewBtn" style="margin-top:12px;">
+        <button class="btn btn-primary btn-block" id="addReviewBtn" onclick="Review.openReviewModal()" style="margin-top:12px;min-height:48px;">
           ➕ 新建复盘
         </button>
       </section>
@@ -136,20 +136,20 @@
           <h3 style="font-size:16px;font-weight:700;display:flex;align-items:center;gap:6px;">
             📚 灵感库
           </h3>
-          <button class="btn btn-sm btn-outline" id="addInspirationBtn">➕ 添加</button>
+          <button class="btn btn-sm btn-outline" id="addInspirationBtn" onclick="Inspiration.openInspirationModal()">➕ 添加</button>
         </div>
 
         <!-- 分类筛选 -->
         <div class="hot-filter">
-          <button class="filter-chip insp-filter-chip active" data-cat="all">全部</button>
-          <button class="filter-chip insp-filter-chip" data-cat="选题方向">🎯 选题</button>
-          <button class="filter-chip insp-filter-chip" data-cat="拍摄手法">📷 拍摄</button>
-          <button class="filter-chip insp-filter-chip" data-cat="转场技巧">✨ 转场</button>
-          <button class="filter-chip insp-filter-chip" data-cat="视觉设计">🎨 视觉</button>
-          <button class="filter-chip insp-filter-chip" data-cat="文案技巧">✍️ 文案</button>
-          <button class="filter-chip insp-filter-chip" data-cat="运营策略">📊 运营</button>
-          <button class="filter-chip insp-filter-chip" data-cat="二创灵感">💡 二创</button>
-          <button class="filter-chip insp-filter-chip" data-cat="自定义">📝 自定义</button>
+          <button class="filter-chip insp-filter-chip active" data-cat="all" onclick="Inspiration.setCategory('all')">全部</button>
+          <button class="filter-chip insp-filter-chip" data-cat="选题方向" onclick="Inspiration.setCategory('选题方向')">🎯 选题</button>
+          <button class="filter-chip insp-filter-chip" data-cat="拍摄手法" onclick="Inspiration.setCategory('拍摄手法')">📷 拍摄</button>
+          <button class="filter-chip insp-filter-chip" data-cat="转场技巧" onclick="Inspiration.setCategory('转场技巧')">✨ 转场</button>
+          <button class="filter-chip insp-filter-chip" data-cat="视觉设计" onclick="Inspiration.setCategory('视觉设计')">🎨 视觉</button>
+          <button class="filter-chip insp-filter-chip" data-cat="文案技巧" onclick="Inspiration.setCategory('文案技巧')">✍️ 文案</button>
+          <button class="filter-chip insp-filter-chip" data-cat="运营策略" onclick="Inspiration.setCategory('运营策略')">📊 运营</button>
+          <button class="filter-chip insp-filter-chip" data-cat="二创灵感" onclick="Inspiration.setCategory('二创灵感')">💡 二创</button>
+          <button class="filter-chip insp-filter-chip" data-cat="自定义" onclick="Inspiration.setCategory('自定义')">📝 自定义</button>
         </div>
 
         <div id="inspirationLibrary"></div>
@@ -220,8 +220,8 @@
           <input type="time" class="input" id="taskTime">
         </div>
         <div style="display:flex;gap:12px;margin-top:20px;">
-          <button type="button" class="btn btn-outline btn-block" id="taskModalClose">取消</button>
-          <button type="button" class="btn btn-primary btn-block" id="taskSaveBtn">保存</button>
+          <button type="button" class="btn btn-outline btn-block" id="taskModalClose" onclick="Tasks.closeTaskModal()">取消</button>
+          <button type="button" class="btn btn-primary btn-block" id="taskSaveBtn" onclick="Tasks.saveTask()">保存</button>
         </div>
       </form>
     </div>
@@ -255,10 +255,10 @@
         </div>
 
         <!-- 截图上传 -->
-        <div class="upload-area" id="screenshotUpload" style="margin-bottom:12px;">
+        <div class="upload-area" id="screenshotUpload" onclick="document.getElementById('screenshotInput').click()" style="margin-bottom:12px;">
           <div class="upload-icon">📸</div>
           <div class="upload-text">上传抖音主页截图<br>自动识别互动数据</div>
-          <input type="file" id="screenshotInput" accept="image/*" style="display:none;">
+          <input type="file" id="screenshotInput" accept="image/*" style="display:none;" onchange="Review.handleScreenshot(event)">
         </div>
 
         <div class="form-row" style="grid-template-columns:repeat(2,1fr);display:grid;gap:12px;">
@@ -293,8 +293,8 @@
         </div>
 
         <div style="display:flex;gap:12px;margin-top:20px;">
-          <button type="button" class="btn btn-outline btn-block" id="reviewModalClose">取消</button>
-          <button type="button" class="btn btn-primary btn-block" id="reviewSaveBtn">保存复盘</button>
+          <button type="button" class="btn btn-outline btn-block" id="reviewModalClose" onclick="Review.closeReviewModal()">取消</button>
+          <button type="button" class="btn btn-primary btn-block" id="reviewSaveBtn" onclick="Review.saveReview()">保存复盘</button>
         </div>
       </form>
     </div>
@@ -304,11 +304,11 @@
   <div class="toast" id="toast"></div>
 
   <!-- 脚本 -->
-  <script src="./modules/store.js"></script>
-  <script src="./modules/tasks.js"></script>
-  <script src="./modules/hotspot.js"></script>
-  <script src="./modules/review.js"></script>
-  <script src="./modules/inspiration.js"></script>
-  <script src="./app.js"></script>
+  <script src="./modules/store.js?v=2"></script>
+  <script src="./modules/tasks.js?v=2"></script>
+  <script src="./modules/hotspot.js?v=2"></script>
+  <script src="./modules/review.js?v=2"></script>
+  <script src="./modules/inspiration.js?v=2"></script>
+  <script src="./app.js?v=2"></script>
 </body>
 </html>

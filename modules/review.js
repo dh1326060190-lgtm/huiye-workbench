@@ -22,15 +22,7 @@ const Review = {
   },
 
   bindEvents() {
-    document.getElementById('addReviewBtn').addEventListener('click', () => this.openReviewModal());
-    document.getElementById('reviewModalClose').addEventListener('click', () => this.closeReviewModal());
-    document.getElementById('reviewSaveBtn').addEventListener('click', () => this.saveReview());
-
-    // 截图上传
-    document.getElementById('screenshotUpload').addEventListener('click', () => {
-      document.getElementById('screenshotInput').click();
-    });
-    document.getElementById('screenshotInput').addEventListener('change', (e) => this.handleScreenshot(e));
+    // 添加/保存/关闭/截图上传按钮已改为 HTML onclick 绑定，兼容 OPPO 等国产浏览器
 
     // 评分星星
     document.addEventListener('click', (e) => {
@@ -59,20 +51,6 @@ const Review = {
     reviews.sort((a, b) => b.createdAt - a.createdAt);
 
     container.innerHTML = reviews.map(r => this.renderReviewCard(r)).join('');
-
-    container.querySelectorAll('.review-edit-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.openReviewModal(e.currentTarget.dataset.id);
-      });
-    });
-
-    container.querySelectorAll('.review-delete-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.deleteReview(e.currentTarget.dataset.id);
-      });
-    });
   },
 
   // 渲染复盘卡片
@@ -136,8 +114,8 @@ const Review = {
         </div>
 
         <div style="display:flex;gap:8px;margin-top:10px;">
-          <button class="btn btn-sm btn-outline review-edit-btn" data-id="${r.id}">✏️ 编辑</button>
-          <button class="btn btn-sm btn-outline review-delete-btn" data-id="${r.id}">🗑 删除</button>
+          <button class="btn btn-sm btn-outline review-edit-btn" data-id="${r.id}" onclick="Review.openReviewModal('${r.id}')">✏️ 编辑</button>
+          <button class="btn btn-sm btn-outline review-delete-btn" data-id="${r.id}" onclick="Review.deleteReview('${r.id}')">🗑 删除</button>
         </div>
       </div>
     `;
@@ -145,7 +123,7 @@ const Review = {
 
   // 打开复盘弹窗
   openReviewModal(reviewId = null) {
-    const modal = document.getElementById('reviewModal');
+    const overlay = document.getElementById('reviewModalOverlay');
     const form = document.getElementById('reviewForm');
     form.reset();
 
@@ -178,11 +156,11 @@ const Review = {
       this.renderStars({});
     }
 
-    modal.classList.add('active');
+    overlay.classList.add('active');
   },
 
   closeReviewModal() {
-    document.getElementById('reviewModal').classList.remove('active');
+    document.getElementById('reviewModalOverlay').classList.remove('active');
     this.currentReview = null;
   },
 

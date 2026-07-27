@@ -147,33 +147,36 @@ const Hotspot = {
       if (e.key === 'Enter') this.search();
     });
 
-    // 刷新
-    document.getElementById('hotRefreshBtn').addEventListener('click', () => {
-      showToast('🔄 正在获取最新热点...');
-      setTimeout(() => {
-        this.renderVideos();
-        showToast('✅ 热点已更新');
-      }, 1000);
-    });
+    // 搜索和刷新按钮已改为 HTML onclick 绑定
+  },
+
+  // 刷新热点
+  refresh() {
+    showToast('🔄 正在获取最新热点...');
+    setTimeout(() => {
+      this.renderVideos();
+      showToast('✅ 热点已更新');
+    }, 1000);
   },
 
   // 渲染关键词筛选
   renderKeywords() {
     const container = document.getElementById('hotKeywords');
-    const allChip = `<button class="filter-chip active" data-keyword="all">全部</button>`;
+    const allChip = `<button class="filter-chip active" data-keyword="all" onclick="Hotspot.setKeyword('all')">全部</button>`;
     const chips = this.KEYWORDS.map(k =>
-      `<button class="filter-chip" data-keyword="${k.id}">${k.emoji} ${k.name}</button>`
+      `<button class="filter-chip" data-keyword="${k.id}" onclick="Hotspot.setKeyword('${k.id}')">${k.emoji} ${k.name}</button>`
     ).join('');
     container.innerHTML = allChip + chips;
+  },
 
-    container.querySelectorAll('.filter-chip').forEach(chip => {
-      chip.addEventListener('click', (e) => {
-        container.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-        e.target.classList.add('active');
-        this.currentKeyword = e.target.dataset.keyword;
-        this.renderVideos();
-      });
-    });
+  // 设置关键词筛选
+  setKeyword(keyword) {
+    this.currentKeyword = keyword;
+    const container = document.getElementById('hotKeywords');
+    container.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    const active = container.querySelector(`[data-keyword="${keyword}"]`);
+    if (active) active.classList.add('active');
+    this.renderVideos();
   },
 
   // 搜索
@@ -218,28 +221,6 @@ const Hotspot = {
     }
 
     container.innerHTML = videos.map(v => this.renderVideoCard(v)).join('');
-
-    // 绑定事件
-    container.querySelectorAll('.remix-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.showRemixSuggestion(e.currentTarget.dataset.id);
-      });
-    });
-
-    container.querySelectorAll('.favorite-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.toggleFavorite(e.currentTarget.dataset.id);
-      });
-    });
-
-    container.querySelectorAll('.open-video-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        showToast('🔗 在抖音App中打开...');
-      });
-    });
   },
 
   // 渲染单个视频卡片
@@ -262,11 +243,11 @@ const Hotspot = {
           <div class="video-title">${v.title}</div>
           <div class="video-author">${v.avatar} ${v.author} · ${v.publishTime}</div>
           <div class="video-actions">
-            <button class="btn btn-sm btn-primary remix-btn" data-id="${v.id}">💡 二创建议</button>
-            <button class="btn btn-sm btn-outline favorite-btn" data-id="${v.id}">
+            <button class="btn btn-sm btn-primary remix-btn" data-id="${v.id}" onclick="Hotspot.showRemixSuggestion('${v.id}')">💡 二创建议</button>
+            <button class="btn btn-sm btn-outline favorite-btn" data-id="${v.id}" onclick="Hotspot.toggleFavorite('${v.id}')">
               ${isFav ? '⭐ 已收藏' : '☆ 收藏'}
             </button>
-            <button class="btn btn-sm btn-outline open-video-btn" data-id="${v.id}">🔗 打开</button>
+            <button class="btn btn-sm btn-outline open-video-btn" data-id="${v.id}" onclick="showToast('🔗 在抖音App中打开...')">🔗 打开</button>
           </div>
           <div id="remix-${v.id}" style="display:none;margin-top:10px;"></div>
         </div>

@@ -44,15 +44,15 @@ const Inspiration = {
   },
 
   bindEvents() {
-    document.querySelectorAll('.insp-filter-chip').forEach(chip => {
-      chip.addEventListener('click', (e) => {
-        document.querySelectorAll('.insp-filter-chip').forEach(c => c.classList.remove('active'));
-        e.target.classList.add('active');
-        this.renderLibrary(e.target.dataset.cat);
-      });
-    });
+    // 筛选和添加按钮已改为 HTML onclick 绑定，兼容 OPPO 等国产浏览器
+  },
 
-    document.getElementById('addInspirationBtn').addEventListener('click', () => this.openInspirationModal());
+  // 设置灵感分类
+  setCategory(category) {
+    document.querySelectorAll('.insp-filter-chip').forEach(c => c.classList.remove('active'));
+    const active = document.querySelector(`.insp-filter-chip[data-cat="${category}"]`);
+    if (active) active.classList.add('active');
+    this.renderLibrary(category);
   },
 
   // 获取每日推荐（基于日期种子随机选3条）

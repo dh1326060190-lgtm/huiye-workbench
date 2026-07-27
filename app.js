@@ -38,13 +38,12 @@ const App = {
       });
     });
 
-    // 任务模块事件
-    document.getElementById('taskSaveBtn').addEventListener('click', () => Tasks.saveTask());
+    // 保存按钮已改为 HTML onclick 绑定
+    // 弹窗背景关闭保留（点击半透明区域关闭）
     document.getElementById('taskModalOverlay').addEventListener('click', (e) => {
       if (e.target.id === 'taskModalOverlay') Tasks.closeTaskModal();
     });
 
-    // 复盘弹窗背景点击关闭
     document.getElementById('reviewModalOverlay').addEventListener('click', (e) => {
       if (e.target.id === 'reviewModalOverlay') Review.closeReviewModal();
     });
