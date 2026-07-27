@@ -10,7 +10,7 @@ const App = {
     if ('caches' in window) {
       caches.keys().then(names => {
         names.forEach(name => {
-          if (name !== 'huiye-v6.0.0') {
+          if (name !== 'huiye-v7.0.0') {
             caches.delete(name);
             console.log('[App] 清除旧缓存:', name);
           }
@@ -98,9 +98,12 @@ const App = {
     // 滚动到顶部
     document.querySelector('.app-main').scrollTop = 0;
 
-    // 切换到规划页时重新渲染
+    // 切换页面时重新渲染对应模块
     if (page === 'planner' && Planner) {
       Planner.renderPage();
+    }
+    if (page === 'tasks' && Tasks) {
+      Tasks.render();
     }
   },
 

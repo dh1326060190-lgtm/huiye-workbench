@@ -1,6 +1,6 @@
 // 绘野工作台 Service Worker v6
 // 策略：不缓存HTML，只做离线兜底
-const CACHE_VERSION = 'huiye-v6.0.0';
+const CACHE_VERSION = 'huiye-v7.0.0';
 
 // 激活时清除所有旧缓存
 self.addEventListener('activate', (event) => {

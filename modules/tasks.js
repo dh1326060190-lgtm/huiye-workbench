@@ -39,10 +39,18 @@ const Tasks = {
     this.renderList();
   },
 
-  // 获取今日任务
+  // 获取本周任务（周一到周日）
   getTodayTasks() {
-    const today = Store.today();
-    return Store.get(Store.KEYS.TASKS).filter(t => t.date === today);
+    const now = new Date();
+    const day = now.getDay();
+    const diff = day === 0 ? 6 : day - 1;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - diff);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const mondayStr = monday.toISOString().split('T')[0];
+    const sundayStr = sunday.toISOString().split('T')[0];
+    return Store.get(Store.KEYS.TASKS).filter(t => t.date >= mondayStr && t.date <= sundayStr);
   },
 
   // 渲染整个模块
@@ -92,7 +100,7 @@ const Tasks = {
       container.innerHTML = `
         <div class="empty-state">
           <div class="emoji">📋</div>
-          <div class="text">${this.currentFilter === 'all' ? '今天还没有任务<br>点击右下角添加你的第一个任务' : '该分类暂无任务'}</div>
+          <div class="text">${this.currentFilter === 'all' ? '本周还没有任务<br>去「规划」页生成内容计划吧' : '该分类暂无任务'}</div>
         </div>
       `;
       return;
@@ -111,6 +119,14 @@ const Tasks = {
       ? this.escape(task.note).replace(/\n/g, '<br>')
       : '';
 
+    // 日期标签：显示月/日 + 星期
+    let dateTag = '';
+    if (task.date) {
+      const d = new Date(task.date + 'T00:00:00');
+      const days = ['日', '一', '二', '三', '四', '五', '六'];
+      dateTag = `<span class="tag tag-date">📅 ${(d.getMonth() + 1)}/${d.getDate()} 周${days[d.getDay()]}</span>`;
+    }
+
     return `
       <div class="task-item ${pri.class} ${task.completed ? 'completed' : ''}" data-id="${task.id}" onclick="Tasks.openTaskModal('${task.id}')">
         <div class="task-checkbox ${task.completed ? 'checked' : ''}" data-id="${task.id}" onclick="event.stopPropagation(); Tasks.toggleTask('${task.id}')"></div>
@@ -118,6 +134,7 @@ const Tasks = {
           <div class="task-title">${this.escape(task.title)}</div>
           ${noteHtml ? `<div class="task-note">${noteHtml}</div>` : ''}
           <div class="task-meta">
+            ${dateTag}
             <span class="tag ${cat.color}">${cat.emoji} ${cat.name}</span>
             <span class="tag">${pri.name}优</span>
             ${task.time ? `<span class="tag">⏰ ${task.time}</span>` : ''}

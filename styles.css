@@ -527,6 +527,12 @@ button, [onclick] {
   padding: 2px 8px;
 }
 
+.tag-date {
+  background: rgba(249,115,22,0.15) !important;
+  color: #fb923c !important;
+  font-weight: 600;
+}
+
 .task-actions {
   display: flex;
   gap: 4px;
