@@ -192,39 +192,138 @@ const Review = {
     }
   },
 
-  // 处理截图上传（模拟OCR识别）
+  // 处理截图上传 - 使用 Tesseract.js 本地OCR识别
   async handleScreenshot(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    showToast('🔍 正在识别截图数据...');
+    showToast('🔍 正在加载识别引擎...');
 
-    // 模拟OCR识别过程
-    // 实际实现需要接入OCR服务（如百度OCR / 腾讯OCR）
-    setTimeout(() => {
-      // 生成模拟识别结果
-      const mockData = {
-        views: Math.floor(Math.random() * 50000 + 5000),
-        likes: Math.floor(Math.random() * 5000 + 200),
-        comments: Math.floor(Math.random() * 500 + 20),
-        shares: Math.floor(Math.random() * 300 + 10)
-      };
+    try {
+      // 动态加载 Tesseract.js（首次加载约需下载语言包）
+      if (!window.Tesseract) {
+        showToast('📦 首次使用需下载中文语言包（约10MB），请稍候...');
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+        await new Promise((resolve, reject) => {
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
 
-      document.getElementById('dataViews').value = mockData.views;
-      document.getElementById('dataLikes').value = mockData.likes;
-      document.getElementById('dataComments').value = mockData.comments;
-      document.getElementById('dataShares').value = mockData.shares;
+      showToast('🔍 正在识别截图中的数字...');
 
-      showToast('✅ 截图识别完成，请核对数据');
-    }, 1500);
+      // 将图片转为可处理的URL
+      const imageUrl = URL.createObjectURL(file);
 
-    // 实际OCR实现示例：
-    // const formData = new FormData();
-    // formData.append('image', file);
-    // const resp = await fetch('/api/ocr', { method: 'POST', body: formData });
-    // const result = await resp.json();
-    // document.getElementById('dataViews').value = result.views;
-    // ...
+      // 使用 Tesseract 识别中文+数字
+      const result = await Tesseract.recognize(imageUrl, 'chi_sim', {
+        logger: (m) => {
+          if (m.status === 'recognizing text') {
+            const progress = Math.round(m.progress * 100);
+            // 只在进度变化较大时更新
+          }
+        }
+      });
+
+      URL.revokeObjectURL(imageUrl);
+
+      // 从识别结果中提取数字
+      const text = result.data.text;
+      console.log('[OCR] 识别原文:', text);
+
+      const data = this.parseScreenshotData(text);
+
+      document.getElementById('dataViews').value = data.views;
+      document.getElementById('dataLikes').value = data.likes;
+      document.getElementById('dataComments').value = data.comments;
+      document.getElementById('dataShares').value = data.shares;
+
+      showToast('✅ 识别完成！请核对数字是否准确，可手动修改');
+    } catch (err) {
+      console.error('[OCR] 识别失败:', err);
+      showToast('⚠️ 自动识别失败，请手动输入数据');
+    }
+  },
+
+  // 从OCR识别文本中解析抖音数据
+  // 抖音截图通常包含: 播放量 点赞 评论 分享
+  parseScreenshotData(text) {
+    const result = { views: 0, likes: 0, comments: 0, shares: 0 };
+
+    // 清理文本，保留中文字符和数字
+    const cleaned = text.replace(/\s+/g, ' ');
+
+    // 策略1: 匹配 "播放" 后面的数字（抖音截图常见格式）
+    const playPatterns = [
+      /播放[:\s]*(\d[\d,.]*[万wW]?)/i,
+      /播放量[:\s]*(\d[\d,.]*[万wW]?)/i,
+      /浏览[:\s]*(\d[\d,.]*[万wW]?)/i,
+    ];
+    for (const p of playPatterns) {
+      const m = cleaned.match(p);
+      if (m) { result.views = this.parseNumber(m[1]); break; }
+    }
+
+    // 策略2: 匹配 "点赞" / "赞"
+    const likePatterns = [
+      /点赞[:\s]*(\d[\d,.]*[万wW]?)/i,
+      /赞[:\s]*(\d[\d,.]*[万wW]?)/i,
+      /❤[:\s]*(\d[\d,.]*[万wW]?)/i,
+    ];
+    for (const p of likePatterns) {
+      const m = cleaned.match(p);
+      if (m) { result.likes = this.parseNumber(m[1]); break; }
+    }
+
+    // 策略3: 匹配 "评论"
+    const commentPatterns = [
+      /评论[:\s]*(\d[\d,.]*[万wW]?)/i,
+      /💬[:\s]*(\d[\d,.]*[万wW]?)/i,
+    ];
+    for (const p of commentPatterns) {
+      const m = cleaned.match(p);
+      if (m) { result.comments = this.parseNumber(m[1]); break; }
+    }
+
+    // 策略4: 匹配 "分享" / "转发"
+    const sharePatterns = [
+      /分享[:\s]*(\d[\d,.]*[万wW]?)/i,
+      /转发[:\s]*(\d[\d,.]*[万wW]?)/i,
+      /🔗[:\s]*(\d[\d,.]*[万wW]?)/i,
+    ];
+    for (const p of sharePatterns) {
+      const m = cleaned.match(p);
+      if (m) { result.shares = this.parseNumber(m[1]); break; }
+    }
+
+    // 兜底：如果关键词匹配失败，尝试从文本中按顺序提取所有数字
+    // 抖音截图通常按 播放→点赞→评论→分享 的顺序排列
+    if (result.views === 0 && result.likes === 0) {
+      const allNums = cleaned.match(/\d[\d,.]*[万wW]?/g);
+      if (allNums && allNums.length >= 4) {
+        const nums = allNums.map(n => this.parseNumber(n));
+        // 最大的一般是播放量
+        const sorted = [...nums].sort((a, b) => b - a);
+        result.views = sorted[0] || 0;
+        result.likes = sorted[1] || 0;
+        result.comments = sorted[2] || 0;
+        result.shares = sorted[3] || 0;
+      }
+    }
+
+    return result;
+  },
+
+  // 解析数字（支持万、千、逗号分隔等格式）
+  parseNumber(str) {
+    if (!str) return 0;
+    str = str.replace(/,/g, '');
+    if (str.endsWith('万') || str.endsWith('w') || str.endsWith('W')) {
+      return Math.round(parseFloat(str) * 10000);
+    }
+    return parseInt(str) || 0;
   },
 
   // 计算平均分

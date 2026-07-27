@@ -1,5 +1,5 @@
 // 绘野工作台 Service Worker
-const CACHE_VERSION = 'huiye-v1.0.0';
+const CACHE_VERSION = 'huiye-v1.1.0';
 const CACHE_NAME = `${CACHE_VERSION}`;
 const ASSETS_TO_CACHE = [
   './',
