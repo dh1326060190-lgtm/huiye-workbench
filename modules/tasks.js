@@ -106,12 +106,17 @@ const Tasks = {
     const cat = this.CATEGORIES.find(c => c.id === task.category) || this.CATEGORIES[3];
     const pri = this.PRIORITIES.find(p => p.id === task.priority) || this.PRIORITIES[1];
 
+    // 备注换行转<br>，让详细的操作指南分行显示
+    const noteHtml = task.note
+      ? this.escape(task.note).replace(/\n/g, '<br>')
+      : '';
+
     return `
       <div class="task-item ${pri.class} ${task.completed ? 'completed' : ''}" data-id="${task.id}" onclick="Tasks.openTaskModal('${task.id}')">
         <div class="task-checkbox ${task.completed ? 'checked' : ''}" data-id="${task.id}" onclick="event.stopPropagation(); Tasks.toggleTask('${task.id}')"></div>
         <div class="task-content">
           <div class="task-title">${this.escape(task.title)}</div>
-          ${task.note ? `<div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">${this.escape(task.note)}</div>` : ''}
+          ${noteHtml ? `<div class="task-note">${noteHtml}</div>` : ''}
           <div class="task-meta">
             <span class="tag ${cat.color}">${cat.emoji} ${cat.name}</span>
             <span class="tag">${pri.name}优</span>
