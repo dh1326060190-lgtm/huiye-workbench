@@ -13,6 +13,9 @@ const App = {
         .catch(err => console.warn('[App] SW 注册失败:', err));
     }
 
+    // 全局触摸修复：确保 OPPO/UC/夸克等国产浏览器点击正常
+    this.fixTouch();
+
     // 初始化各模块
     Tasks.seedDemoTasks();
     Review.seedDemoReview();
@@ -29,6 +32,13 @@ const App = {
 
     // 检测首次使用
     this.checkFirstUse();
+  },
+
+  // 全局触摸修复：解决 OPPO/UC/夸克等浏览器点击不响应问题
+  fixTouch() {
+    document.addEventListener('touchstart', function(e) {
+      // 不做任何阻止，只是让浏览器正确识别可交互元素
+    }, { passive: true });
   },
 
   bindNav() {
