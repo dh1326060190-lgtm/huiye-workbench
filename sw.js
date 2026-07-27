@@ -1,5 +1,5 @@
 // 绘野工作台 Service Worker v2
-const CACHE_VERSION = 'huiye-v2.0.0';
+const CACHE_VERSION = 'huiye-v3.0.0';
 const CACHE_NAME = CACHE_VERSION;
 
 // 激活时清除所有旧缓存
