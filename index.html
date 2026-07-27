@@ -11,10 +11,10 @@
   <meta name="apple-mobile-web-app-title" content="绘野工作台">
   <meta name="theme-color" content="#6c5ce7">
   <meta name="description" content="小赵和小董的视觉新居 - 内容创作工作台">
-  <link rel="manifest" href="./manifest.json?v=11">
-  <link rel="apple-touch-icon" href="./assets/icon-192.svg?v=11">
-  <link rel="icon" type="image/svg+xml" href="./assets/icon-192.svg?v=11">
-  <link rel="stylesheet" href="./styles.css?v=11">
+  <link rel="manifest" href="./manifest.json?v=12">
+  <link rel="apple-touch-icon" href="./assets/icon-192.svg?v=12">
+  <link rel="icon" type="image/svg+xml" href="./assets/icon-192.svg?v=12">
+  <link rel="stylesheet" href="./styles.css?v=12">
   <title>绘野工作台</title>
 </head>
 <body>
@@ -121,6 +121,15 @@
         <button class="btn btn-primary btn-block" id="addReviewBtn" onclick="Review.openReviewModal()" style="margin-top:12px;min-height:48px;">
           ➕ 新建复盘
         </button>
+
+        <!-- 数据备份 -->
+        <div style="margin-top:16px;padding:12px;background:var(--bg-card);border-radius:12px;border:1px solid var(--border);">
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">💾 数据备份：防止换设备/清缓存后数据丢失</div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-sm btn-outline" onclick="App.exportData()" style="flex:1;">📤 导出全部数据</button>
+            <button class="btn btn-sm btn-outline" onclick="App.importData()" style="flex:1;">📥 导入数据</button>
+          </div>
+        </div>
       </section>
 
       <!-- ============ 灵感页 ============ -->
@@ -321,12 +330,12 @@
   <div class="toast" id="toast"></div>
 
   <!-- 脚本 -->
-  <script src="./modules/store.js?v=11"></script>
-  <script src="./modules/tasks.js?v=11"></script>
-  <script src="./modules/hotspot.js?v=11"></script>
-  <script src="./modules/review.js?v=11"></script>
-  <script src="./modules/inspiration.js?v=11"></script>
-  <script src="./modules/planner.js?v=11"></script>
-  <script src="./app.js?v=11"></script>
+  <script src="./modules/store.js?v=12"></script>
+  <script src="./modules/tasks.js?v=12"></script>
+  <script src="./modules/hotspot.js?v=12"></script>
+  <script src="./modules/review.js?v=12"></script>
+  <script src="./modules/inspiration.js?v=12"></script>
+  <script src="./modules/planner.js?v=12"></script>
+  <script src="./app.js?v=12"></script>
 </body>
 </html>

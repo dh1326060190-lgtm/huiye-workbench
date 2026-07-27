@@ -10,7 +10,7 @@ const App = {
     if ('caches' in window) {
       caches.keys().then(names => {
         names.forEach(name => {
-          if (name !== 'huiye-v7.0.0') {
+          if (name !== 'huiye-v8.0.0') {
             caches.delete(name);
             console.log('[App] 清除旧缓存:', name);
           }
@@ -105,6 +105,12 @@ const App = {
     if (page === 'tasks' && Tasks) {
       Tasks.render();
     }
+    if (page === 'review' && Review) {
+      Review.renderList();
+    }
+    if (page === 'inspiration' && Inspiration) {
+      Inspiration.render();
+    }
   },
 
   updateDate() {
@@ -122,6 +128,59 @@ const App = {
         showToast('👋 欢迎使用绘野工作台！已为你生成示例数据，可在此基础上开始创作');
       }, 500);
     }
+  },
+
+  // 导出全部数据到剪贴板
+  exportData() {
+    const data = {
+      tasks: Store.get(Store.KEYS.TASKS),
+      reviews: Store.get(Store.KEYS.REVIEWS),
+      inspirations: Store.get(Store.KEYS.INSPIRATIONS),
+      favorites: Store.get(Store.KEYS.FAVORITES),
+      plans: Store.get(Store.KEYS.PLANS),
+      settings: Store.get(Store.KEYS.SETTINGS),
+      exportTime: new Date().toISOString()
+    };
+    const json = JSON.stringify(data);
+    navigator.clipboard.writeText(json).then(() => {
+      showToast('✅ 数据已复制到剪贴板，粘贴到备忘录保存');
+    }).catch(() => {
+      // 降级方案：用 textarea
+      const ta = document.createElement('textarea');
+      ta.value = json;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('✅ 数据已复制到剪贴板，粘贴到备忘录保存');
+    });
+  },
+
+  // 从剪贴板导入数据
+  importData() {
+    navigator.clipboard.readText().then(text => {
+      try {
+        const data = JSON.parse(text);
+        if (!data.exportTime && !data.reviews && !data.tasks) {
+          showToast('❌ 剪贴板内容不是有效的备份数据');
+          return;
+        }
+        if (data.tasks) Store.set(Store.KEYS.TASKS, data.tasks);
+        if (data.reviews) Store.set(Store.KEYS.REVIEWS, data.reviews);
+        if (data.inspirations) Store.set(Store.KEYS.INSPIRATIONS, data.inspirations);
+        if (data.favorites) Store.set(Store.KEYS.FAVORITES, data.favorites);
+        if (data.plans) Store.set(Store.KEYS.PLANS, data.plans);
+        if (data.settings) Store.set(Store.KEYS.SETTINGS, data.settings);
+        showToast('✅ 数据导入成功！正在刷新...');
+        setTimeout(() => location.reload(), 1000);
+      } catch(e) {
+        showToast('❌ 数据格式错误，请确保复制了完整的备份数据');
+      }
+    }).catch(() => {
+      showToast('❌ 无法读取剪贴板，请先复制备份数据');
+    });
   }
 };
 
