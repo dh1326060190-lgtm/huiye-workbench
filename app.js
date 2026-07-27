@@ -97,6 +97,11 @@ const App = {
 
     // 滚动到顶部
     document.querySelector('.app-main').scrollTop = 0;
+
+    // 切换到规划页时重新渲染
+    if (page === 'planner' && Planner) {
+      Planner.renderPage();
+    }
   },
 
   updateDate() {
