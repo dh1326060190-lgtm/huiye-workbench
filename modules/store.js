@@ -8,7 +8,8 @@ const Store = {
     REVIEWS: 'huiye_reviews',
     INSPIRATIONS: 'huiye_inspirations',
     SETTINGS: 'huiye_settings',
-    FAVORITES: 'huiye_favorites'
+    FAVORITES: 'huiye_favorites',
+    PLANS: 'huiye_plans'
   },
 
   // 通用读取

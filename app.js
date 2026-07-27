@@ -10,7 +10,7 @@ const App = {
     if ('caches' in window) {
       caches.keys().then(names => {
         names.forEach(name => {
-          if (name !== 'huiye-v3.0.0') {
+          if (name !== 'huiye-v4.0.0') {
             caches.delete(name);
             console.log('[App] 清除旧缓存:', name);
           }
@@ -42,6 +42,7 @@ const App = {
     Hotspot.init();
     Review.init();
     Inspiration.init();
+    Planner.init();
 
     // 绑定导航
     this.bindNav();
@@ -95,7 +96,8 @@ const App = {
       tasks: '📋 今日任务',
       hotspot: '🔥 热点追踪',
       review: '📊 内容复盘',
-      inspiration: '💡 灵感来源'
+      inspiration: '💡 灵感来源',
+      planner: '📅 内容规划'
     };
     document.getElementById('headerTitle').textContent = titles[page] || '绘野工作台';
 
