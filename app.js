@@ -6,14 +6,33 @@ const App = {
   currentPage: 'tasks',
 
   init() {
-    // 注册 Service Worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js')
-        .then(reg => console.log('[App] SW 注册成功'))
-        .catch(err => console.warn('[App] SW 注册失败:', err));
+    // 强制清除旧版 Service Worker 缓存
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        names.forEach(name => {
+          if (name !== 'huiye-v2.0.0') {
+            caches.delete(name);
+            console.log('[App] 清除旧缓存:', name);
+          }
+        });
+      });
     }
 
-    // 全局触摸修复：确保 OPPO/UC/夸克等国产浏览器点击正常
+    // 注册 Service Worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        regs.forEach(reg => reg.unregister()); // 先注销旧的
+      }).then(() => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => {
+            console.log('[App] SW 注册成功 v2');
+            reg.update();
+          })
+          .catch(err => console.warn('[App] SW 注册失败:', err));
+      });
+    }
+
+    // 全局触摸修复
     this.fixTouch();
 
     // 初始化各模块
