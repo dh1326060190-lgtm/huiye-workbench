@@ -8,10 +8,10 @@
   <meta name="apple-mobile-web-app-title" content="绘野工作台">
   <meta name="theme-color" content="#6c5ce7">
   <meta name="description" content="小赵和小董的视觉新居 - 内容创作工作台">
-  <link rel="manifest" href="./manifest.json?v=3">
-  <link rel="apple-touch-icon" href="./assets/icon-192.svg?v=3">
-  <link rel="icon" type="image/svg+xml" href="./assets/icon-192.svg?v=3">
-  <link rel="stylesheet" href="./styles.css?v=3">
+  <link rel="manifest" href="./manifest.json?v=4">
+  <link rel="apple-touch-icon" href="./assets/icon-192.svg?v=4">
+  <link rel="icon" type="image/svg+xml" href="./assets/icon-192.svg?v=4">
+  <link rel="stylesheet" href="./styles.css?v=4">
   <title>绘野工作台</title>
 </head>
 <body>
@@ -227,15 +227,20 @@
     </div>
   </div>
 
-  <!-- ============ 复盘弹窗 ============ -->
+  <!-- ============ 复盘弹窗 v2 ============ -->
   <div class="modal-overlay" id="reviewModalOverlay">
     <div class="modal" id="reviewModal">
       <div class="modal-handle"></div>
-      <h2 class="modal-title" id="reviewModalTitle">新建复盘</h2>
+      <h2 class="modal-title" id="reviewModalTitle">⚡ 快速复盘</h2>
       <form id="reviewForm" onsubmit="return false;">
         <input type="hidden" id="reviewId">
+
+        <button type="button" class="btn btn-outline btn-block" onclick="Review.smartPaste()" style="margin-bottom:12px;">
+          📋 一键粘贴抖音数据
+        </button>
+
         <div class="form-group">
-          <label>视频标题 *</label>
+          <label>视频标题（可留空）</label>
           <input type="text" class="input" id="videoTitle" placeholder="如：收房第一天验房全记录" maxlength="50">
         </div>
         <div class="form-row">
@@ -247,56 +252,42 @@
               <option value="other">📱 其他</option>
             </select>
           </div>
+          <div class="form-group">
+            <label>发布时间</label>
+            <input type="time" class="input" id="publishTime">
+          </div>
         </div>
 
-        <!-- 数据录入 -->
-        <div style="font-size:13px;font-weight:600;color:var(--text-secondary);margin:16px 0 8px;">
-          📈 互动数据
+        <div style="font-size:13px;font-weight:600;color:var(--text-secondary);margin:12px 0 8px;">
+          📈 输入4个数据（输入后自动分析）
         </div>
-
-        <!-- 截图上传 -->
-        <div class="upload-area" id="screenshotUpload" onclick="document.getElementById('screenshotInput').click()" style="margin-bottom:12px;">
-          <div class="upload-icon" id="uploadIcon">📸</div>
-          <div class="upload-text" id="uploadText">上传抖音主页截图<br>自动识别互动数据</div>
-          <input type="file" id="screenshotInput" accept="image/*" style="display:none;" onchange="Review.handleScreenshot(event)">
-        </div>
-        <!-- 截图预览 -->
-        <div id="screenshotPreview" style="display:none;margin-bottom:12px;text-align:center;">
-          <img id="screenshotImg" style="max-width:100%;max-height:300px;border-radius:8px;border:1px solid var(--border);">
-        </div>
-
         <div class="form-row" style="grid-template-columns:repeat(2,1fr);display:grid;gap:12px;">
           <div class="form-group">
-            <label>播放量</label>
-            <input type="number" class="input" id="dataViews" placeholder="0" min="0">
+            <label>播放量 👁</label>
+            <input type="number" class="input" id="dataViews" placeholder="如：12300" min="0" inputmode="numeric">
           </div>
           <div class="form-group">
-            <label>点赞数</label>
-            <input type="number" class="input" id="dataLikes" placeholder="0" min="0">
+            <label>点赞数 ❤️</label>
+            <input type="number" class="input" id="dataLikes" placeholder="如：680" min="0" inputmode="numeric">
           </div>
           <div class="form-group">
-            <label>评论数</label>
-            <input type="number" class="input" id="dataComments" placeholder="0" min="0">
+            <label>评论数 💬</label>
+            <input type="number" class="input" id="dataComments" placeholder="如：45" min="0" inputmode="numeric">
           </div>
           <div class="form-group">
-            <label>转发数</label>
-            <input type="number" class="input" id="dataShares" placeholder="0" min="0">
+            <label>转发数 🔄</label>
+            <input type="number" class="input" id="dataShares" placeholder="如：32" min="0" inputmode="numeric">
           </div>
         </div>
 
-        <!-- 评分 -->
-        <div style="font-size:13px;font-weight:600;color:var(--text-secondary);margin:16px 0 8px;">
-          ⭐ 内容评分（1-5星）
-        </div>
-        <div class="score-grid" id="reviewScores"></div>
+        <div id="liveAnalysis" style="display:none;"></div>
 
-        <!-- 备注 -->
-        <div class="form-group">
-          <label>复盘笔记</label>
-          <textarea class="textarea" id="reviewNote" placeholder="记录这次内容的亮点和不足..." maxlength="300"></textarea>
+        <div class="form-group" style="margin-top:12px;">
+          <label>复盘笔记（选填）</label>
+          <textarea class="textarea" id="reviewNote" placeholder="记录亮点和不足..." maxlength="200" rows="2"></textarea>
         </div>
 
-        <div style="display:flex;gap:12px;margin-top:20px;">
+        <div style="display:flex;gap:12px;margin-top:16px;">
           <button type="button" class="btn btn-outline btn-block" id="reviewModalClose" onclick="Review.closeReviewModal()">取消</button>
           <button type="button" class="btn btn-primary btn-block" id="reviewSaveBtn" onclick="Review.saveReview()">保存复盘</button>
         </div>
@@ -308,11 +299,11 @@
   <div class="toast" id="toast"></div>
 
   <!-- 脚本 -->
-  <script src="./modules/store.js?v=3"></script>
-  <script src="./modules/tasks.js?v=3"></script>
-  <script src="./modules/hotspot.js?v=3"></script>
-  <script src="./modules/review.js?v=3"></script>
-  <script src="./modules/inspiration.js?v=3"></script>
-  <script src="./app.js?v=3"></script>
+  <script src="./modules/store.js?v=4"></script>
+  <script src="./modules/tasks.js?v=4"></script>
+  <script src="./modules/hotspot.js?v=4"></script>
+  <script src="./modules/review.js?v=4"></script>
+  <script src="./modules/inspiration.js?v=4"></script>
+  <script src="./app.js?v=4"></script>
 </body>
 </html>
