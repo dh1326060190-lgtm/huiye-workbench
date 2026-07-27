@@ -290,18 +290,18 @@ const Planner = {
     const lastReview = this.getLastReview();
 
     // 确定2条视频的日期
-    // 视频1：周一/周二拍摄，周三/周四剪辑，周五发布
-    // 视频2：周三/周四拍摄，周五/周六剪辑，周日发布
-    const d1 = new Date(weekStart + 'T00:00:00');
+    // 视频1：周一拍摄 → 周二剪辑 → 周三发布（工作日黄金时段）
+    // 视频2：周三拍摄 → 周四剪辑 → 周五发布（周五晚流量高峰）
+    // 周末休息，不安排发布
     const video1 = {
-      shoot: this._addDays(weekStart, 1),   // 周二拍摄
-      edit: this._addDays(weekStart, 3),     // 周四剪辑
-      publish: this._addDays(weekStart, 5),  // 周六发布
+      shoot: this._addDays(weekStart, 0),   // 周一拍摄
+      edit: this._addDays(weekStart, 1),     // 周二剪辑
+      publish: this._addDays(weekStart, 2),  // 周三发布
     };
     const video2 = {
-      shoot: this._addDays(weekStart, 3),    // 周四拍摄
-      edit: this._addDays(weekStart, 5),      // 周六剪辑
-      publish: this._addDays(weekStart, 6),   // 周日发布
+      shoot: this._addDays(weekStart, 2),    // 周三拍摄
+      edit: this._addDays(weekStart, 3),      // 周四剪辑
+      publish: this._addDays(weekStart, 4),   // 周五发布
     };
 
     // 获取热点数据
