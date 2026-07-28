@@ -11,10 +11,10 @@
   <meta name="apple-mobile-web-app-title" content="绘野工作台">
   <meta name="theme-color" content="#6c5ce7">
   <meta name="description" content="小赵和小董的视觉新居 - 内容创作工作台">
-  <link rel="manifest" href="./manifest.json?v=14">
-  <link rel="apple-touch-icon" href="./assets/icon-192.svg?v=14">
-  <link rel="icon" type="image/svg+xml" href="./assets/icon-192.svg?v=14">
-  <link rel="stylesheet" href="./styles.css?v=14">
+  <link rel="manifest" href="./manifest.json?v=15">
+  <link rel="apple-touch-icon" href="./assets/icon-192.svg?v=15">
+  <link rel="icon" type="image/svg+xml" href="./assets/icon-192.svg?v=15">
+  <link rel="stylesheet" href="./styles.css?v=15">
   <title>绘野工作台</title>
 </head>
 <body>
@@ -174,6 +174,18 @@
             📅 <strong>一周两更规划</strong>：系统根据上期复盘数据和本周热点趋势，智能生成2条视频选题，并给出拍摄和剪辑优化建议。
           </div>
         </div>
+
+        <!-- 静态生成按钮，确保始终可点击 -->
+        <div id="plannerStaticBtn" style="margin-bottom:16px;">
+          <button class="btn btn-primary btn-block" onclick="tryGeneratePlan()" style="min-height:52px;font-size:16px;font-weight:600;background:linear-gradient(135deg,#f97316,#fb923c);">
+            🚀 智能生成本周计划
+          </button>
+          <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:8px;line-height:1.5;">
+            点击后自动生成2条视频选题 + 6条详细任务<br>
+            包含镜头级拍摄清单、分步剪辑指南、标题建议
+          </p>
+        </div>
+
         <div id="plannerContent"></div>
       </section>
 
@@ -330,12 +342,57 @@
   <div class="toast" id="toast"></div>
 
   <!-- 脚本 -->
-  <script src="./modules/store.js?v=14"></script>
-  <script src="./modules/tasks.js?v=14"></script>
-  <script src="./modules/hotspot.js?v=14"></script>
-  <script src="./modules/review.js?v=14"></script>
-  <script src="./modules/inspiration.js?v=14"></script>
-  <script src="./modules/planner.js?v=14"></script>
-  <script src="./app.js?v=14"></script>
+  <script src="./modules/store.js?v=15"></script>
+  <script src="./modules/tasks.js?v=15"></script>
+  <script src="./modules/hotspot.js?v=15"></script>
+  <script src="./modules/review.js?v=15"></script>
+  <script src="./modules/inspiration.js?v=15"></script>
+  <script src="./modules/planner.js?v=15"></script>
+  <script src="./app.js?v=15"></script>
+  <script>
+  // 全局生成计划函数，带错误捕获
+  function tryGeneratePlan() {
+    try {
+      if (typeof Planner === 'undefined') {
+        alert('错误：Planner模块未加载');
+        return;
+      }
+      if (typeof Store === 'undefined') {
+        alert('错误：Store模块未加载');
+        return;
+      }
+      // 隐藏静态按钮
+      var staticBtn = document.getElementById('plannerStaticBtn');
+      if (staticBtn) staticBtn.style.display = 'none';
+
+      // 执行生成
+      Planner.generatePlan();
+
+      // 验证是否真的生成了
+      var plans = Store.get('huiye_plans', null);
+      if (!plans || !plans.videos || plans.videos.length === 0) {
+        alert('生成失败，请刷新页面重试');
+        if (staticBtn) staticBtn.style.display = 'block';
+        return;
+      }
+
+      // 验证任务是否创建了
+      var tasks = Store.get('huiye_tasks', []);
+      showToast('✅ 成功！生成' + plans.videos.length + '条视频计划，' + tasks.length + '条任务');
+
+      // 3秒后跳转任务页
+      setTimeout(function() {
+        if (typeof App !== 'undefined' && App.switchPage) {
+          App.switchPage('tasks');
+        }
+      }, 3000);
+    } catch(e) {
+      alert('生成出错：' + e.message);
+      console.error('[生成计划错误]', e);
+      var staticBtn = document.getElementById('plannerStaticBtn');
+      if (staticBtn) staticBtn.style.display = 'block';
+    }
+  }
+  </script>
 </body>
 </html>
