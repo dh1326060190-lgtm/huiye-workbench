@@ -374,27 +374,95 @@ const Planner = {
     return d.toISOString().split('T')[0];
   },
 
-  // ============ 自动创建��联任务 ============
+  // ============ 自动创建关联任务 ============
   createLinkedTasks(plan) {
     if (!Tasks) return;
 
     const tasks = Store.get(Store.KEYS.TASKS);
     const taskIds = [];
 
-    // 拍摄任务 - 详细说明拍什么、怎么拍
-    const shootNoteParts = [];
-    shootNoteParts.push('🎯 选题：' + plan.topic);
-    if (plan.topicSource === 'review') shootNoteParts.push('📊 基于上期复盘优化方向');
-    if (plan.topicSource === 'hotspot') shootNoteParts.push('🔥 参考本周热点趋势');
-    // 提取前2条拍摄要点
-    const shootLines = plan.shootingNotes.split('\n').filter(l => l.trim());
-    if (shootLines.length > 0) shootNoteParts.push('📷 ' + shootLines[0]);
-    if (shootLines.length > 1) shootNoteParts.push('📷 ' + shootLines[1]);
+    // ========== 拍摄任务 ==========
+    const shootTopic = plan.topic;
+    const shootSource = plan.topicSource === 'review' ? '📊 基于上期复盘数据优化' :
+                        plan.topicSource === 'hotspot' ? '🔥 参考本周热点趋势' :
+                        '🎯 本周选题轮换推荐';
+
+    // 根据选题关键词生成具体拍摄清单
+    const isHouse = shootTopic.includes('收房') || shootTopic.includes('验房') || shootTopic.includes('交付');
+    const isRenovate = shootTopic.includes('装修') || shootTopic.includes('水电') || shootTopic.includes('施工');
+    const isVisual = shootTopic.includes('风格') || shootTopic.includes('视觉') || shootTopic.includes('设计') || shootTopic.includes('收纳');
+    const isFurniture = shootTopic.includes('好物') || shootTopic.includes('清单') || shootTopic.includes('必买') || shootTopic.includes('神器');
+
+    let shootList = [];
+    if (isHouse) {
+      shootList = [
+        '镜头1（开场3秒）：站在门口全景，说"收房千万别急着签字！"，表情严肃',
+        '镜头2：入户门检查——门框缝隙、门锁、门吸，用手指比划缝隙大小',
+        '镜头3：墙面空鼓——用空鼓锤敲击，特写手势+声音',
+        '镜头4：地面平整——用靠尺或手机水平仪，特写数值',
+        '镜头5：窗户密封——纸条夹窗缝测试，推拉顺滑度',
+        '镜头6：水电检查——开关插座、水龙头出水、地漏排水',
+        '镜头7（结尾）：总结清单+互动"你们收房还发现了什么问题？评论区说说"',
+      ];
+    } else if (isRenovate) {
+      shootList = [
+        '镜头1（开场3秒）：施工现场全景，说"装修第X天，今天做XXX"',
+        '镜头2：施工前状态记录（毛坯/拆除后）',
+        '镜头3：施工过程特写——工人操作、材料进场',
+        '镜头4：关键节点讲解——面对镜头说明注意事项',
+        '镜头5：验收细节——用卷尺/水平仪检测',
+        '镜头6（结尾）：今日总结+下期预告"明天继续XXX，关注不迷路"',
+      ];
+    } else if (isVisual) {
+      shootList = [
+        '镜头1（开场3秒）：成品全景扫视，配文字"这就是收房后的效果"',
+        '镜头2：设计图纸/效果图对比实景（左右分屏或转场对比）',
+        '镜头3：色彩搭配讲解——指着墙面/家具/软装逐一介绍',
+        '镜头4：空间利用亮点——打开收纳柜、展示多功能区域',
+        '镜头5：细节特写——灯具/把手/装饰画等质感镜头',
+        '镜头6（结尾）："这样的风格你们喜欢吗？评论区告诉我"',
+      ];
+    } else if (isFurniture) {
+      shootList = [
+        '镜头1（开场3秒）：所有好物摆一排全景，说"收房后这些钱绝对不能省"',
+        '镜头2-6：每件好物单独展示——开箱→使用场景→特写细节→价格',
+        '镜头7：使用前后对比（有/没有这件物品的区别）',
+        '镜头8（结尾）："你最想买哪件？评论区告诉我，我发链接"',
+      ];
+    } else {
+      shootList = [
+        '镜头1（开场3秒）：最吸引人的画面/冲突场景，配悬念字幕',
+        '镜头2-5：主体内容分点讲解，每点一个镜头',
+        '镜头6（结尾）：总结+互动引导"你们觉得呢？"',
+      ];
+    }
+
+    // 提取上期复盘的拍摄优化建议
+    const reviewTips = plan.shootingNotes.split('\n').filter(l => l.trim() && (l.includes('⚠️') || l.includes('💡')));
+    const reviewTipText = reviewTips.length > 0
+      ? '\n📌 上期复盘优化提醒：\n' + reviewTips.map(t => '  ' + t).join('\n')
+      : '';
+
+    const shootNote = [
+      '🎯 选题：' + shootTopic,
+      '📍 来源：' + shootSource,
+      '',
+      '📋 拍摄清单（按顺序执行）：',
+      ...shootList.map((s, i) => '  ' + s),
+      '',
+      '装备清单：',
+      '  ☐ 手机/相机（充满电+备用电池）',
+      '  ☐ 三脚架/稳定器',
+      '  ☐ 领夹麦克风（收音清晰）',
+      '  ☐ 补光灯（室内光线不足时用）',
+      '  ☐ 空鼓锤/靠尺/卷尺（验房类必备）',
+      reviewTipText,
+    ].filter(l => l !== null).join('\n');
 
     const shootTask = {
       id: Store.genId(),
-      title: '🎬 拍摄「' + plan.topic.substring(0, 20) + '」',
-      note: shootNoteParts.join('\n'),
+      title: '🎬 拍摄「' + plan.topic.substring(0, 18) + '」',
+      note: shootNote,
       category: 'shoot',
       priority: 'high',
       time: '10:00',
@@ -405,18 +473,80 @@ const Planner = {
     tasks.push(shootTask);
     taskIds.push(shootTask.id);
 
-    // 剪辑任务 - 详细说明剪辑技巧和要点
-    const editNoteParts = [];
-    editNoteParts.push('🎬 素材：' + plan.topic);
-    // 提取前3条剪辑要点
-    const editLines = plan.editingNotes.split('\n').filter(l => l.trim() && !l.startsWith('🔥') && !l.startsWith('📋'));
-    editLines.slice(0, 3).forEach(l => editNoteParts.push('✂️ ' + l.replace(/^[·\s\d.]+/, '')));
-    editNoteParts.push('📤 发布日：' + plan.scheduled.publish);
+    // ========== 剪辑任务 ==========
+    let editSteps = [];
+    if (isHouse) {
+      editSteps = [
+        '第1步：粗剪——把7个镜头按顺序排列，每个镜头保留精华部分，总时长控制在60-90秒',
+        '第2步：开场加强——前3秒用最严重的问题画面+大字字幕"开发商最怕你查！"',
+        '第3步：节奏调整——讲解部分1.2倍速，展示部分正常速，关键问题处放慢',
+        '第4步：字幕——每个检查项加编号字幕（①入户门②墙面③地面），关键词红色加粗',
+        '第5步：BGM——前3秒紧张音效，正文用轻快BGM（音量30%）',
+        '第6步：片尾——关注引导动画+"完整验房清单评论区领"文字停留3秒',
+      ];
+    } else if (isRenovate) {
+      editSteps = [
+        '第1步：粗剪——施工过程快进处理（2-3倍速），讲解部分正常速度',
+        '第2步：开场——"装修第X天"大字+当日核心画面3秒',
+        '第3步：对比——施工前→施工后用转场效果（推拉/擦除）',
+        '第4步：字幕——关键参数/尺寸/材料用大字标注，费用明细列表展示',
+        '第5步：音效——施工声音适当保留（有代入感），配轻快BGM',
+        '第6步：片尾——"明天继续XXX"预告+关注引导',
+      ];
+    } else if (isVisual) {
+      editSteps = [
+        '第1步：粗剪——成品展示镜头保留精华，讲解部分精简',
+        '第2步：开场——成品全景3秒+大字"收房后装成了这样"',
+        '第3步：对比转场——设计图→实景用渐变/溶解转场',
+        '第4步：色彩强调——每个区域标注色系名称（如"莫兰迪灰""奶油白"）',
+        '第5步：细节蒙太奇——灯具/把手/装饰画快速切换（每个0.5秒）',
+        '第6步：片尾——全景收尾+关注引导"更多装修灵感关注我们"',
+      ];
+    } else if (isFurniture) {
+      editSteps = [
+        '第1步：粗剪——每件好物保留5-8秒精华，总时长90-120秒',
+        '第2步：开场——所有物品一字排开3秒+大字"这10件好物闭眼入"',
+        '第3步：节奏——开箱（快）→使用场景（正常）→特写（慢）交替',
+        '第4步：字幕——每件物品标价格+使用场景，关键词红色',
+        '第5步：对比——使用前后分屏对比（左：没有 右：有）',
+        '第6步：片尾——"评论区扣1要链接"+关注引导',
+      ];
+    } else {
+      editSteps = [
+        '第1步：粗剪——按脚本顺序排列镜头，保留精华去掉废话',
+        '第2步：开场——前3秒放最吸引人的画面+悬念字幕',
+        '第3步：节奏——每个镜头不超过5秒，信息密度要高',
+        '第4步：字幕——关键信息大字标注，关键词变色',
+        '第5步：BGM——选热门BGM，音量不超过30%',
+        '第6步：片尾——关注引导+互动提问停留3秒',
+      ];
+    }
+
+    // 提取热点剪辑技巧
+    const hotspotEditTips = plan.editingNotes.split('\n').filter(l => l.trim() && l.includes('参考'));
+    const hotspotText = hotspotEditTips.length > 0
+      ? '\n🔥 参考热点视频剪辑技巧：\n' + hotspotEditTips.map(t => '  ' + t).join('\n')
+      : '';
+
+    const editNote = [
+      '🎬 素材：' + plan.topic,
+      '⏱ 目标时长：60-90秒',
+      '',
+      '📋 剪辑步骤（按顺序执行）：',
+      ...editSteps.map(s => '  ' + s),
+      '',
+      '导出设置：',
+      '  ☐ 分辨率：1080x1920（竖屏9:16）',
+      '  ☐ 帧率：30fps',
+      '  ☐ 码率：8-12Mbps',
+      '  ☐ 格式：MP4（H.264）',
+      hotspotText,
+    ].filter(l => l !== null).join('\n');
 
     const editTask = {
       id: Store.genId(),
-      title: '✂️ 剪辑「' + plan.topic.substring(0, 20) + '」',
-      note: editNoteParts.join('\n'),
+      title: '✂️ 剪辑「' + plan.topic.substring(0, 18) + '」',
+      note: editNote,
       category: 'edit',
       priority: 'high',
       time: '14:00',
@@ -427,21 +557,67 @@ const Planner = {
     tasks.push(editTask);
     taskIds.push(editTask.id);
 
-    // 发布任务 - 含发布检查清单
-    const publishNoteParts = [];
-    publishNoteParts.push('📹 视频：「' + plan.topic.substring(0, 25) + '」');
-    publishNoteParts.push('⏰ 最佳发布时间：18:00-21:00');
-    publishNoteParts.push('📋 发布检查清单：');
-    publishNoteParts.push('  □ 封面是否吸引人？');
-    publishNoteParts.push('  □ 标题是否有数字/情绪词？');
-    publishNoteParts.push('  □ 话题标签是否添加（收房/装修/家居）？');
-    publishNoteParts.push('  □ 发布后1小时内回复前10条评论');
-    publishNoteParts.push('💡 发布后记得来「复盘」记录数据');
+    // ========== 发布任务 ==========
+    // 根据选题生成标题建议
+    let titleSuggestions = [];
+    if (isHouse) {
+      titleSuggestions = [
+        '收房千万别先签字！这7个地方开发商最怕你查',
+        '验房师教你7个细节，第3个90%的人忽略',
+        '收房当天我们发现了大问题...差点亏了2万',
+      ];
+    } else if (isRenovate) {
+      titleSuggestions = [
+        '装修第X天：水电改造全记录，差点多花2万',
+        '装修中最容易踩的5个坑，我们全踩了',
+        '从毛坯到入住180天记录，变化太大了',
+      ];
+    } else if (isVisual) {
+      titleSuggestions = [
+        '收房后装成了这样！邻居都来抄作业',
+        '60平装出120平效果，设计师手把手教你',
+        '2026年最火的3种装修风格，我们选了这种',
+      ];
+    } else if (isFurniture) {
+      titleSuggestions = [
+        '收房后买了这10件神器，每件都好用到哭',
+        '装修必买清单：这些钱绝对不能省',
+        '入住一个月后，最不后悔的5个决定',
+      ];
+    } else {
+      titleSuggestions = [
+        plan.topic,
+        '90%的人都不知道：' + plan.topic,
+        '【EP.01】' + plan.topic,
+      ];
+    }
+
+    const publishNote = [
+      '📹 视频：「' + plan.topic + '」',
+      '',
+      '📝 标题建议（选一个）：',
+      ...titleSuggestions.map(t => '  · ' + t),
+      '',
+      '🏷 话题标签（复制使用）：',
+      '  #收房验房 #装修避坑 #新房装修 #家居好物 #收房日记 #小赵和小董的视觉新居',
+      '',
+      '⏰ 最佳发布时间：18:00-21:00',
+      '',
+      '📋 发布检查清单：',
+      '  ☐ 封面：大字标题占画面1/4，对比色描边',
+      '  ☐ 标题：有数字+情绪词+悬念',
+      '  ☐ 话题标签：已添加5个以上',
+      '  ☐ 位置：添加城市定位（增加同城流量）',
+      '  ☐ 首发1小时：回复前10条评论（带节奏）',
+      '  ☐ 互动：自己先评论一条引导讨论',
+      '',
+      '💡 发布后24小时来「复盘」记录数据',
+    ].join('\n');
 
     const publishTask = {
       id: Store.genId(),
-      title: '📤 发布「' + plan.topic.substring(0, 20) + '」',
-      note: publishNoteParts.join('\n'),
+      title: '📤 发布「' + plan.topic.substring(0, 18) + '」',
+      note: publishNote,
       category: 'publish',
       priority: 'high',
       time: '19:00',
