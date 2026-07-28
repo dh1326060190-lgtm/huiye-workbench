@@ -162,9 +162,9 @@ const Hotspot = {
 
   renderKeywords() {
     const container = document.getElementById('hotKeywords');
-    const allChip = '<button class="filter-chip active" data-keyword="all" onclick="Hotspot.setKeyword(\\'all\\')">全部</button>';
+    const allChip = '<button class="filter-chip active" data-keyword="all" onclick="Hotspot.setKeyword(\'all\')">全部</button>';
     const chips = this.KEYWORDS.map(k =>
-      '<button class="filter-chip" data-keyword="' + k.id + '" onclick="Hotspot.setKeyword(\\'' + k.id + '\\')">' + k.emoji + ' ' + k.name + '</button>'
+      '<button class="filter-chip" data-keyword="' + k.id + '" onclick="Hotspot.setKeyword(\'' + k.id + '\')">' + k.emoji + ' ' + k.name + '</button>'
     ).join('');
     container.innerHTML = allChip + chips;
   },
@@ -211,7 +211,7 @@ const Hotspot = {
     const favorites = Store.get(Store.KEYS.FAVORITES, []);
     const isFav = favorites.includes(v.id);
     return '<div class="video-card">' +
-      '<div class="video-thumb" onclick="Hotspot.openVideo(\\'' + v.id + '\\')">' +
+      '<div class="video-thumb" onclick="Hotspot.openVideo(\'' + v.id + '\')">' +
       '<span style="font-size:48px;">' + v.thumbnail + '</span>' +
       '<div class="play-overlay">▶</div>' +
       '<div class="video-stats">' +
@@ -223,9 +223,9 @@ const Hotspot = {
       '<div class="video-title">' + v.title + '</div>' +
       '<div class="video-author">' + v.avatar + ' ' + v.author + ' · ' + v.publishTime + '</div>' +
       '<div class="video-actions">' +
-      '<button class="btn btn-sm btn-primary remix-btn" onclick="Hotspot.showRemixSuggestion(\\'' + v.id + '\\')">二创建议</button>' +
-      '<button class="btn btn-sm btn-outline" onclick="Hotspot.toggleFavorite(\\'' + v.id + '\\')">' + (isFav ? '已收藏' : '收藏') + '</button>' +
-      '<button class="btn btn-sm btn-outline" onclick="Hotspot.openVideo(\\'' + v.id + '\\')">打开抖音</button>' +
+      '<button class="btn btn-sm btn-primary remix-btn" onclick="Hotspot.showRemixSuggestion(\'' + v.id + '\')">二创建议</button>' +
+      '<button class="btn btn-sm btn-outline" onclick="Hotspot.toggleFavorite(\'' + v.id + '\')">' + (isFav ? '已收藏' : '收藏') + '</button>' +
+      '<button class="btn btn-sm btn-outline" onclick="Hotspot.openVideo(\'' + v.id + '\')">打开抖音</button>' +
       '</div>' +
       '<div id="remix-' + v.id + '" style="display:none;margin-top:10px;"></div>' +
       '</div></div>';
@@ -244,8 +244,8 @@ const Hotspot = {
       '<div class="remix-title">🎯 二创改编建议</div>' +
       '<div class="remix-tips">' + video.remixTips + '</div>' +
       '<div style="margin-top:10px;display:flex;gap:8px;">' +
-      '<button class="btn btn-sm btn-accent" onclick="Hotspot.saveInspiration(\\'' + videoId + '\\')">📝 存为灵感</button>' +
-      '<button class="btn btn-sm btn-outline" onclick="Hotspot.copyRemix(\\'' + videoId + '\\')">📋 复制文案</button>' +
+      '<button class="btn btn-sm btn-accent" onclick="Hotspot.saveInspiration(\'' + videoId + '\')">📝 存为灵感</button>' +
+      '<button class="btn btn-sm btn-outline" onclick="Hotspot.copyRemix(\'' + videoId + '\')">📋 复制文案</button>' +
       '</div></div>';
   },
 

@@ -110,7 +110,7 @@ const Planner = {
 
   // ============ 获取匹配的热点视频 ============
   getMatchingHotspots(keyword) {
-    if (!Hotspot || !Hotspot.MOCK_VIDEOS) return [];
+    if (typeof Hotspot === 'undefined' || !Hotspot.MOCK_VIDEOS) return [];
     return Hotspot.MOCK_VIDEOS
       .filter(v => v.keyword === keyword || keyword === 'all')
       .sort((a, b) => (b.likes + b.comments * 3 + b.shares * 2) - (a.likes + a.comments * 3 + a.shares * 2))
@@ -305,7 +305,7 @@ const Planner = {
     };
 
     // 获取热点数据
-    const allHotspots = Hotspot && Hotspot.MOCK_VIDEOS ? [...Hotspot.MOCK_VIDEOS]
+    const allHotspots = (typeof Hotspot !== 'undefined' && Hotspot.MOCK_VIDEOS) ? [...Hotspot.MOCK_VIDEOS]
       .sort((a, b) => (b.likes + b.comments * 3 + b.shares * 2) - (a.likes + a.comments * 3 + a.shares * 2))
       : [];
 
