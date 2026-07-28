@@ -117,76 +117,93 @@ const Planner = {
       .slice(0, 3);
   },
 
-  // ============ 智能选题生成 ============
-  generateTopic(index, lastReview, hotspots) {
+  // ============ 选题连续性映射表 ============
+  // 根据上条视频方向，推荐下一条连续性选题
+  TOPIC_FLOW: {
+    'house': { next: 'renovate', reason: '收房验房后自然进入装修阶段，保持系列连续性' },
+    'renovate': { next: 'visual', reason: '装修施工完成后展示视觉效果，形成完整蜕变链路' },
+    'visual': { next: 'furniture', reason: '硬装完成后进入软装好物阶段，内容自然衔接' },
+    'furniture': { next: 'house', reason: '好物推荐后回到新的收房/验房话题，开启新系列' },
+    'transition': { next: 'visual', reason: '转场技巧展示后，应用到实际视觉设计中' },
+    'unbox': { next: 'furniture', reason: '开箱后展示实际使用场景，形成种草闭环' },
+  },
+
+  // ============ 智能选题生成（含连续性） ============
+  generateTopic(index, lastReview, hotspots, lastPublishedTitle) {
     // index: 0=第一条视频, 1=第二条视频
     const weekNum = parseInt(this.getWeekStart().split('-')[2]) || 1;
 
+    // 优先使用手动填写的发布标题来判断连续性
+    var lastTitle = lastPublishedTitle || (lastReview ? lastReview.videoTitle : '');
+
     if (index === 0) {
-      // 第一条视频：复盘驱动（40%）+ 选题池（60%）
-      if (lastReview && lastReview.data) {
-        const { views, likes, comments, shares } = lastReview.data;
-        const likeRate = views > 0 ? (likes / views * 100) : 0;
-        const commentRate = views > 0 ? (comments / views * 100) : 0;
-        const shareRate = views > 0 ? (shares / views * 100) : 0;
-
-        // 找最弱的数据维度
-        const metrics = [
-          { name: 'like', value: likeRate, keyword: 'house' },
-          { name: 'comment', value: commentRate, keyword: 'renovate' },
-          { name: 'share', value: shareRate, keyword: 'visual' },
-        ];
-        metrics.sort((a, b) => a.value - b.value);
-        const weakest = metrics[0];
-
-        if (weakest.value < 2) {
-          // 数据确实弱，针对性选题
-          const poolItem = this.TOPIC_POOL.find(t => t.keyword === weakest.keyword);
-          if (poolItem) {
-            const reason = weakest.name === 'like' ? '上期点赞率偏低，本期加强情绪钩子' :
-                           weakest.name === 'comment' ? '上期评论率偏低，本期侧重互动话题' :
-                           '上期转发率偏低，本期侧重实用干货';
+      // ========== 第一条视频：基于上条视频的连续性 ==========
+      if (lastTitle) {
+        // 判断上条视频的方向
+        var lastKeyword = this._detectKeyword(lastTitle);
+        var flow = this.TOPIC_FLOW[lastKeyword];
+        if (flow) {
+          // 找到连续性选题
+          var poolItems = this.TOPIC_POOL.filter(function(t) { return t.keyword === flow.next; });
+          if (poolItems.length > 0) {
+            var poolIdx = weekNum % poolItems.length;
+            var poolItem = poolItems[poolIdx];
             return {
               topic: poolItem.topic,
               source: 'review',
-              reason: reason,
-              keyword: poolItem.keyword
+              reason: '上条视频「' + lastTitle.substring(0, 15) + '...」→ ' + flow.reason,
+              keyword: poolItem.keyword,
+              lastTitle: lastTitle
             };
           }
         }
       }
-      // 复盘数据不错或无复盘 → 选题池
-      const poolIdx = (weekNum + index) % this.TOPIC_POOL.length;
-      const poolItem = this.TOPIC_POOL[poolIdx];
+
+      // 没有上条视频信息 → 选题池轮换
+      var poolIdx = (weekNum + index) % this.TOPIC_POOL.length;
+      var poolItem = this.TOPIC_POOL[poolIdx];
       return {
         topic: poolItem.topic,
         source: 'pool',
-        reason: '按本周选题轮换推荐',
+        reason: '新系列开篇，按选题轮换推荐',
         keyword: poolItem.keyword
       };
     } else {
-      // 第二条视频：热点驱动（50%）+ 选题池（50%）
+      // ========== 第二条视频：承接第一条 + 热点融合 ==========
+      // 第二条应该和第一条有区分但又有连续性
       if (hotspots && hotspots.length > 0) {
-        const top = hotspots[0];
-        // 基于热点标题改写
-        const hotTopic = '热点趋势：' + top.title.substring(0, 20) + '...我们的版本';
+        var top = hotspots[0];
+        var hotTopic = '热点追踪：' + top.title.substring(0, 20) + '...我们的版本';
         return {
           topic: hotTopic,
           source: 'hotspot',
-          reason: '参考本周最热视频「' + top.author + '」的选题方向',
+          reason: '参考本周最热视频「' + top.author + '」方向，与第一条形成内容互补',
           keyword: top.keyword,
           hotspotIds: [top.id]
         };
       }
-      const poolIdx = (weekNum + index + 3) % this.TOPIC_POOL.length;
-      const poolItem = this.TOPIC_POOL[poolIdx];
+      var poolIdx2 = (weekNum + index + 3) % this.TOPIC_POOL.length;
+      var poolItem2 = this.TOPIC_POOL[poolIdx2];
       return {
-        topic: poolItem.topic,
+        topic: poolItem2.topic,
         source: 'pool',
-        reason: '按本周选题轮换推荐',
-        keyword: poolItem.keyword
+        reason: '与第一条形成内容互补，按选题轮换推荐',
+        keyword: poolItem2.keyword
       };
     }
+  },
+
+  // ============ 检测标题对应的选题方向 ============
+  _detectKeyword(title) {
+    if (!title) return 'house';
+    var t = title.toLowerCase();
+    if (t.includes('收房') || t.includes('验房') || t.includes('交付') || t.includes('签字')) return 'house';
+    if (t.includes('装修') || t.includes('水电') || t.includes('施工') || t.includes('防水') || t.includes('泥瓦') || t.includes('木工')) return 'renovate';
+    if (t.includes('风格') || t.includes('视觉') || t.includes('设计') || t.includes('收纳') || t.includes('色彩') || t.includes('搭配')) return 'visual';
+    if (t.includes('好物') || t.includes('清单') || t.includes('必买') || t.includes('神器') || t.includes('开箱') || t.includes('推荐')) return 'furniture';
+    if (t.includes('转场') || t.includes('剪辑技巧')) return 'transition';
+    if (t.includes('开箱')) return 'unbox';
+    return 'house';
   },
 
   // ============ 生成拍摄注意点 ============
@@ -290,17 +307,17 @@ const Planner = {
     const lastReview = this.getLastReview();
 
     // 确定2条视频的日期
-    // 视频1：周一拍摄 → 周二剪辑 → 周三发布
-    // 视频2：周三拍摄 → 周四剪辑 → 周五发布
-    // 周末休息，不安排拍摄和发布
+    // 时间安排：周一到周五只有晚7点后有空，周末全天有空
+    // 视频1：周六拍摄（全天）→ 周日剪辑（全天）→ 周三发布（晚7点后）
+    // 视频2：周一晚拍摄 → 周二晚剪辑 → 周五发布（晚7点后）
     const video1 = {
-      shoot: this._addDays(weekStart, 0),   // 周一拍摄
-      edit: this._addDays(weekStart, 1),     // 周二剪辑
+      shoot: this._addDays(weekStart, 5),   // 周六拍摄
+      edit: this._addDays(weekStart, 6),     // 周日剪辑
       publish: this._addDays(weekStart, 2),  // 周三发布
     };
     const video2 = {
-      shoot: this._addDays(weekStart, 2),    // 周三拍摄
-      edit: this._addDays(weekStart, 3),      // 周四剪辑
+      shoot: this._addDays(weekStart, 0),    // 周一晚拍摄
+      edit: this._addDays(weekStart, 1),      // 周二晚剪辑
       publish: this._addDays(weekStart, 4),   // 周五发布
     };
 
@@ -309,12 +326,30 @@ const Planner = {
       .sort((a, b) => (b.likes + b.comments * 3 + b.shares * 2) - (a.likes + a.comments * 3 + a.shares * 2))
       : [];
 
-    // 生成视频1选题
-    const topic1 = this.generateTopic(0, lastReview, allHotspots);
+    // 获取上条实际发布的视频标题（从计划数据中读取）
+    const lastPlan = this.getPlanData();
+    var lastPublishedTitle = '';
+    if (lastPlan && lastPlan.videos) {
+      // 找最近一条已发布且有实际标题的视频
+      for (var i = 0; i < lastPlan.videos.length; i++) {
+        var v = lastPlan.videos[i];
+        if (v.status === 'published' && v.actualTitle) {
+          lastPublishedTitle = v.actualTitle;
+          break;
+        }
+      }
+    }
+    // 如果没有手动填写的标题，用复盘标题
+    if (!lastPublishedTitle && lastReview) {
+      lastPublishedTitle = lastReview.videoTitle || '';
+    }
+
+    // 生成视频1选题（基于上条视频连续性）
+    const topic1 = this.generateTopic(0, lastReview, allHotspots, lastPublishedTitle);
     const hotspots1 = this.getMatchingHotspots(topic1.keyword);
 
-    // 生成视频2选题
-    const topic2 = this.generateTopic(1, lastReview, allHotspots);
+    // 生成视频2选题（与第一条互补）
+    const topic2 = this.generateTopic(1, lastReview, allHotspots, lastPublishedTitle);
     const hotspots2 = this.getMatchingHotspots(topic2.keyword);
 
     const videos = [
@@ -473,7 +508,7 @@ const Planner = {
       note: shootNote,
       category: 'shoot',
       priority: 'high',
-      time: '10:00',
+      time: '19:00',  // 工作日晚或周末，统一晚上7点
       done: false,
       date: plan.scheduled.shoot,
       createdAt: Date.now(),
@@ -557,7 +592,7 @@ const Planner = {
       note: editNote,
       category: 'edit',
       priority: 'high',
-      time: '14:00',
+      time: '19:30',  // 晚饭后剪辑
       done: false,
       date: plan.scheduled.edit,
       createdAt: Date.now(),
@@ -675,6 +710,33 @@ const Planner = {
 
     this.renderPage();
     showToast('✅ 状态已更新：' + this._statusLabel(newStatus));
+  },
+
+  // ============ 手动填写实际发布内容 ============
+  setActualTitle(planId) {
+    var title = prompt('请输入实际发布的视频标题：\n（如果没按计划发布，填写实际发布的标题，系统会根据这个标题规划后续内容）', '');
+    if (title === null) return; // 取消
+    if (title.trim() === '') {
+      showToast('标题不能为空');
+      return;
+    }
+
+    var data = this.getPlanData();
+    var plan = data.videos.find(function(v) { return v.id === planId; });
+    if (!plan) return;
+
+    plan.actualTitle = title.trim();
+    plan.status = 'published';
+    plan.updatedAt = Date.now();
+
+    // 完成所有关联任务
+    if (plan.linkedTaskIds && plan.linkedTaskIds.length > 0) {
+      plan.linkedTaskIds.forEach(tid => this._completeTask(tid));
+    }
+
+    this.savePlanData(data);
+    this.renderPage();
+    showToast('✅ 已记录实际发布内容，下次生成计划将基于此标题衔接');
   },
 
   // ============ 辅助：完成任务 ============
@@ -875,6 +937,15 @@ const Planner = {
       nextBtns.forEach(btn => {
         html += '<button class="btn btn-sm btn-primary" onclick="Planner.updateStatus(\'' + plan.id + '\', \'' + btn.key + '\')">' + btn.label + '</button>';
       });
+      // 非"已发布"状态都可以填写实际发布内容
+      html += '<button class="btn btn-sm btn-outline" onclick="Planner.setActualTitle(\'' + plan.id + '\')">✏️ 填写实际发布内容</button>';
+      html += '</div>';
+    }
+
+    // 已发布且有实际标题时显示
+    if (plan.status === 'published' && plan.actualTitle) {
+      html += '<div style="margin-top:10px;padding:8px 10px;background:rgba(16,185,129,0.08);border-radius:8px;font-size:12px;color:var(--success);">';
+      html += '✅ 实际发布：' + this._escapeHtml(plan.actualTitle);
       html += '</div>';
     }
 
