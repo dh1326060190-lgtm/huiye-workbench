@@ -364,7 +364,14 @@ const Planner = {
 
     this.savePlanData(planData);
     this.renderPage();
-    showToast('✅ 本周计划已生成！已自动创建拍摄/剪辑/发布任务');
+    showToast('✅ 计划已生成！6条任务已创建，3秒后跳转任务页...');
+
+    // 3秒后自动跳转到任务页，让用户看到生成的任务
+    setTimeout(() => {
+      if (typeof App !== 'undefined' && App.switchPage) {
+        App.switchPage('tasks');
+      }
+    }, 3000);
   },
 
   // ============ 辅助：日期加减 ============
