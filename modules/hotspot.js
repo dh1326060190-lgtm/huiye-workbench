@@ -290,7 +290,7 @@ const Hotspot = {
     });
   },
 
-  // 打开视频 - 根据视频标题精准搜索并跳转抖音
+  // 打开视频 - 优先用真实视频ID直接跳转，否则用标题精准搜索
   openVideo(videoId) {
     const video = this.MOCK_VIDEOS.find(v => v.id === videoId);
     if (!video) {
@@ -298,53 +298,53 @@ const Hotspot = {
       return;
     }
 
-    // 提取视频标题中的关键词作为搜索词
-    // 去掉标点符号，取前30个字作为搜索关键词
-    const searchKeyword = video.title.replace(/[^\\u4e00-\\u9fa5a-zA-Z0-9]/g, ' ').replace(/\\s+/g, ' ').trim().substring(0, 30);
-    const encodedKeyword = encodeURIComponent(searchKeyword);
+    // 提取视频完整标题
+    const rawTitle = video.title.trim();
+    const encodedTitle = encodeURIComponent(rawTitle);
 
-    // 方案1：尝试唤起抖音App（抖音URL Scheme）
-    const douyinAppScheme = 'snssdk1128://search/' + encodedKeyword + '?type=video';
-    const douyinWebUrl = 'https://www.douyin.com/search/' + encodedKeyword + '?type=video';
-
-    // 使用iframe方式尝试唤起App
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = douyinAppScheme;
-    document.body.appendChild(iframe);
-
-    // 设置超时：如果3秒内没唤起App，就打开网页版
-    const fallbackTimer = setTimeout(() => {
-      document.body.removeChild(iframe);
-      window.open(douyinWebUrl, '_blank');
-    }, 3000);
-
-    // 监听页面可见性变化：如果App被唤起了，页面会变为不可见
-    const visibilityHandler = () => {
-      if (document.hidden) {
-        clearTimeout(fallbackTimer);
-        if (document.body.contains(iframe)) document.body.removeChild(iframe);
-        document.removeEventListener('visibilitychange', visibilityHandler);
+    // 判断是否有真实视频ID（douyin video ID 通常是15~20位数字）
+    let targetAppUrl, targetWebUrl;
+    if (video.realVideoId && /^\d{15,20}$/.test(video.realVideoId)) {
+      // 有真实视频ID：直接打开视频详情页
+      targetAppUrl = 'snssdk1128://aweme/detail/' + video.realVideoId;
+      targetWebUrl = 'https://www.douyin.com/video/' + video.realVideoId;
+      showToast('正在打开抖音视频...');
+    } else {
+      // 没有真实ID：用完整标题做精准搜索（优于之前的截断关键词搜索）
+      // 优先使用预设的 douyinUrl 搜索链接
+      if (video.douyinUrl && video.douyinUrl.indexOf('douyin.com/search/') !== -1) {
+        targetWebUrl = video.douyinUrl + '?type=video';
+      } else {
+        targetWebUrl = 'https://www.douyin.com/search/' + encodedTitle + '?type=video';
       }
-    };
-    document.addEventListener('visibilitychange', visibilityHandler);
+      targetAppUrl = 'snssdk1128://search/' + encodedTitle + '?type=video';
+      showToast('正在打开抖音搜索...');
+    }
 
-    // 额外保险：如果页面失焦也视为成功唤起
-    const blurHandler = () => {
-      clearTimeout(fallbackTimer);
-      if (document.body.contains(iframe)) document.body.removeChild(iframe);
-      window.removeEventListener('blur', blurHandler);
-      document.removeEventListener('visibilitychange', visibilityHandler);
-    };
-    window.addEventListener('blur', blurHandler);
+    // 用 location.href 方式唤起 App（比 iframe 兼容性更好）
+    var startTime = Date.now();
+    window.location.href = targetAppUrl;
 
-    // 8秒后无论如何清理
-    setTimeout(() => {
+    // 如果2.5秒后页面还没跳走（App没被唤起），打开网页版
+    var fallbackTimer = setTimeout(function() {
+      if (Date.now() - startTime < 2600) {
+        window.open(targetWebUrl, '_blank');
+      }
+    }, 2500);
+
+    // 页面失焦/隐藏时清除回退定时器
+    var cleanup = function() {
       clearTimeout(fallbackTimer);
-      if (document.body.contains(iframe)) document.body.removeChild(iframe);
-      document.removeEventListener('visibilitychange', visibilityHandler);
-      window.removeEventListener('blur', blurHandler);
-    }, 8000);
+      document.removeEventListener('visibilitychange', cleanup);
+      window.removeEventListener('blur', cleanup);
+      window.removeEventListener('pagehide', cleanup);
+    };
+    document.addEventListener('visibilitychange', cleanup);
+    window.addEventListener('blur', cleanup);
+    window.addEventListener('pagehide', cleanup);
+
+    // 6秒后强制清理
+    setTimeout(cleanup, 6000);
   },
 
   // 打开抖音搜索关键词（保留兼容）
