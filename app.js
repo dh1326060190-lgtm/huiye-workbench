@@ -10,7 +10,7 @@ const App = {
     if ('caches' in window) {
       caches.keys().then(names => {
         names.forEach(name => {
-          if (name !== 'huiye-v12.0.0') {
+          if (name !== 'huiye-v13.0.0') {
             caches.delete(name);
             console.log('[App] 清除旧缓存:', name);
           }
