@@ -551,7 +551,7 @@ a{color:inherit;text-decoration:none;}
       theme:"green",
       remindTask:true, remindSaving:true, remindWedding:true,
       autoBackup:true, lockEnabled:false,
-      githubToken:"", ghLogin:"", ghRepo:"dh1326060150-lgtrn/huiye-workbench", ghBranch:"main", ghPath:"workbench-data.json", cloudSync:false,
+      githubToken:"", ghLogin:"", ghRepo:"dh1326060190-lgtm/huiye-workbench", ghBranch:"main", ghPath:"workbench-data.json", cloudSync:false,
     },
     // 1. 今日计划
     todayTasks:[
@@ -2229,7 +2229,7 @@ a{color:inherit;text-decoration:none;}
           <p class="muted" style="font-size:12.5px;line-height:1.7;margin:0 0 10px">数据自动保存到 GitHub 仓库，<b>所有设备共享同一份数据</b>。需先在 GitHub 创建仓库并生成 Token（需 repo 权限），然后填写下方配置。</p>
           <div class="form" style="margin-bottom:10px">
             <div class="grp"><label>GitHub Token</label><input id="ghToken" type="password" value="${App.esc(st.githubToken)}" placeholder="ghp_xxxxxxxx"></div>
-            <div class="grp"><label>仓库名（owner/repo）</label><input id="ghRepo" value="${App.esc(st.ghRepo)}" placeholder="如 dh1326060150-lgtrn/huiye-workbench"></div>
+            <div class="grp"><label>仓库名（owner/repo）</label><input id="ghRepo" value="${App.esc(st.ghRepo)}" placeholder="如 dh1326060190-lgtm/huiye-workbench"></div>
             <div class="grp"><label>分支</label><input id="ghBranch" value="${App.esc(st.ghBranch||'main')}" placeholder="main"></div>
             <div class="grp"><label>文件路径</label><input id="ghPath" value="${App.esc(st.ghPath||'workbench-data.json')}" placeholder="workbench-data.json"></div>
             <button class="btn btn-primary" data-action="gh-save">保存 GitHub 配置</button>
