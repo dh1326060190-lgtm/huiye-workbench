@@ -838,52 +838,53 @@ a{color:inherit;text-decoration:none;}
         const content = JSON.stringify(store.state, (k,v)=> (k==="githubToken")?undefined:v, 2);
         const b64content = b64encode(content);
         const msg = "workbench sync " + new Date().toISOString().slice(0,19).replace("T"," ");
-        // 策略：先尝试正常 PUT（带 sha），如果 409 则「先删再建」强制覆盖
+        // 策略：先查文件是否存在，存在就删掉，然后新建（避免所有 sha 冲突）
         let sha = null;
         try{
           const getRes = await fetch(apiUrl(c,true), {headers: headers(c)});
           if(getRes.ok) sha = (await getRes.json()).sha || null;
         }catch(e){}
 
-        // 第一次尝试：正常 PUT
-        let res = await fetch(apiUrl(c,false), {
+        // 如果文件已存在，先删除（确保后续 PUT 不需要 sha）
+        if(sha){
+          const delRes = await fetch(apiUrl(c,false), {
+            method: "DELETE",
+            headers: Object.assign(headers(c), {"Content-Type":"application/json"}),
+            body: JSON.stringify({message:"sync: replace", sha:sha, branch:c.branch})
+          });
+          // 删除失败也不中断，继续尝试 PUT
+        }
+
+        // 新建文件（不带 sha，因为上面已经删了）
+        const res = await fetch(apiUrl(c,false), {
           method: "PUT",
           headers: Object.assign(headers(c), {"Content-Type":"application/json"}),
-          body: JSON.stringify({message:msg, content:b64content, branch:c.branch, sha:sha})
+          body: JSON.stringify({message:msg, content:b64content, branch:c.branch})
         });
         if(res.ok){
           lastContentHash = hash(content);
           if(App.ui&&App.ui.toast) App.ui.toast("☁ 已同步到 GitHub");
           pushing=false; return;
         }
-        // 409 冲突 → 先删再建（强制覆盖）
-        if(res.status===409){
-          // 重新获取最新 sha 用于删除
+        // 如果还是 422（删没成功），用带 sha 的方式再试一次
+        if(res.status===422){
           try{
             const getRes2 = await fetch(apiUrl(c,true), {headers: headers(c)});
             if(getRes2.ok) sha = (await getRes2.json()).sha || null;
           }catch(e){}
           if(sha){
-            // 删除旧文件
-            await fetch(apiUrl(c,false), {
-              method: "DELETE",
+            const res2 = await fetch(apiUrl(c,false), {
+              method: "PUT",
               headers: Object.assign(headers(c), {"Content-Type":"application/json"}),
-              body: JSON.stringify({message:"sync: delete stale", sha:sha, branch:c.branch})
+              body: JSON.stringify({message:msg, content:b64content, branch:c.branch, sha:sha})
             });
-          }
-          // 重新创建（不带 sha）
-          res = await fetch(apiUrl(c,false), {
-            method: "PUT",
-            headers: Object.assign(headers(c), {"Content-Type":"application/json"}),
-            body: JSON.stringify({message:msg, content:b64content, branch:c.branch})
-          });
-          if(res.ok){
-            lastContentHash = hash(content);
-            if(App.ui&&App.ui.toast) App.ui.toast("☁ 已同步到 GitHub");
-            pushing=false; return;
+            if(res2.ok){
+              lastContentHash = hash(content);
+              if(App.ui&&App.ui.toast) App.ui.toast("☁ 已同步到 GitHub");
+              pushing=false; return;
+            }
           }
         }
-        // 其他错误
         const errBody = await res.json().catch(()=>({}));
         throw new Error("HTTP " + res.status + (errBody.message?": "+errBody.message:""));
       }catch(err){
