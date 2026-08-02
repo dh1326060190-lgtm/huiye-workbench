@@ -643,6 +643,7 @@ a{color:inherit;text-decoration:none;}
       {id:"h9",rank:9,title:"本地宝藏婚宴酒店盘点",heat:451200,track:"本地生活"},
       {id:"h10",rank:10,title:"备婚期如何兼顾工作不崩溃",heat:412800,track:"本地生活"},
     ],
+    hotspotsAll:[],
     hotMeta:{updated:"", platform:"douyin", themeOnly:true},
     // 5. 备婚管理
     wedding:{
@@ -781,7 +782,7 @@ a{color:inherit;text-decoration:none;}
   App.todayStr = todayStr;
   App.TODAY = todayStr();
   App.refreshToday = function(){ App.TODAY = todayStr(); App.todayNum = ts(App.TODAY); return App.TODAY; };
-  App.BUILD = "2026-08-02.19";
+  App.BUILD = "2026-08-02.20";
 
   const clone = (o)=>JSON.parse(JSON.stringify(o));
 
@@ -1221,14 +1222,12 @@ a{color:inherit;text-decoration:none;}
     if(!res.ok) throw new Error("HTTP "+res.status);
     const j = await res.json();
     if(!j || j.code!==200 || !Array.isArray(j.data)) throw new Error("数据为空");
-    const themeOnly = !(store.state.hotMeta && store.state.hotMeta.themeOnly===false); // 默认只看家装/避坑
-    let list = j.data.slice(0,40).map((x,i)=>({
+    // 返回完整前 40 条（含 track/heat）；主题过滤与兜底推荐统一在上层处理
+    return j.data.slice(0,40).map((x,i)=>({
       id:"h"+(i+1), rank:i+1, title:x.title,
       heat:(x.hot_value!=null?x.hot_value:(x.hot!=null?x.hot:(x.heat||0))),
       track:App.inferTrack(x.title), link:x.link||""
     }));
-    if(themeOnly) list = list.filter(x=>App.isThemeHit(x.title));
-    return list.slice(0,20);
   };
 
   // ====================================================
@@ -1317,7 +1316,8 @@ a{color:inherit;text-decoration:none;}
 
     // ---- 热点 -> 创作助手 ----
     hotspotToTopic(id){
-      const h=store.state.hotspots.find(x=>x.id===id); if(!h)return null;
+      const all=[...(store.state.hotspotsAll||[]), ...(store.state.hotspots||[])];
+      const h=all.find(x=>x.id===id); if(!h)return null;
       const t={id:store.uid("tp"),title:h.title,platform:"小红书",track:h.track,status:"未拍摄",script:"",note:"来自热点榜 #"+h.rank};
       store.state.topics.unshift(t); save(); return t;
     },
@@ -1325,11 +1325,13 @@ a{color:inherit;text-decoration:none;}
     async refreshHotspots(platform){
       platform = platform || (store.state.hotMeta && store.state.hotMeta.platform) || "douyin";
       try{
-        const list = await App.fetchHot(platform);
-        store.state.hotspots = list;
+        const all = await App.fetchHot(platform);            // 完整前 40 条
+        store.state.hotspotsAll = all;
+        const themeOnly = !(store.state.hotMeta && store.state.hotMeta.themeOnly===false); // 默认只看家装/避坑
+        store.state.hotspots = themeOnly ? all.filter(x=>App.isThemeHit(x.title)) : all.slice(0,20);
         store.state.hotMeta = {updated:new Date().toISOString(), platform};
         save();
-        return {ok:true, n:list.length, platform};
+        return {ok:true, n:store.state.hotspots.length, platform, all:all.length};
       }catch(e){ return {ok:false, err:e.message}; }
     },
 
@@ -1967,7 +1969,7 @@ a{color:inherit;text-decoration:none;}
     }
     const platBtns = App.HOT_PLATFORMS.map(p=>`<button class="btn btn-sm ${p.key===cur?'btn-primary':'btn-ghost'}" data-action="hot-plat" data-plat="${p.key}">${p.name}</button>`).join("");
     const themeBtn = `<button class="btn btn-sm ${themeOn?'btn-primary':'btn-ghost'}" data-action="hot-theme">${themeOn?'🏠 仅家装/避坑':'🌐 全部热点'}</button>`;
-    const rows=s.hotspots.map(h=>`<div class="row" data-search="${App.esc(h.title)}">
+    const hotRow = h=>`<div class="row" data-search="${App.esc(h.title)}">
       <div class="main" style="display:flex;gap:12px;align-items:center">
         <span style="font-size:18px;font-weight:800;color:${h.rank<=3?'var(--danger)':'var(--text-3)'};min-width:22px">${h.rank}</span>
         <div><div class="title">${h.link?`<a href="${App.esc(h.link)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${App.esc(h.title)}</a>`:App.esc(h.title)}</div>
@@ -1976,16 +1978,32 @@ a{color:inherit;text-decoration:none;}
       <div class="ops">
         <button class="link" data-action="gen-from-hot" data-id="${h.id}">生成选题+脚本</button>
         <button class="link" data-action="add-from-hot" data-id="${h.id}">加入选题库</button>
-      </div></div>`).join("");
+      </div></div>`;
+    const rows = s.hotspots.map(hotRow).join("");
     const upd = meta.updated ? ("更新于 "+new Date(meta.updated).toLocaleString("zh-CN")) : "尚未更新（打开自动拉取）";
-    const listBody = s.hotspots.length ? rows
-      : (themeOn ? empty("今天家装/避坑相关热点较少，点「🌐 全部热点」看看其他热搜") : empty("暂无数据，点右上角刷新试试"));
+    // 主题过滤后为空 → 兜底推荐：家装类浏览量 Top 15 + 热点话题浏览量 Top 15
+    const showFallback = themeOn && s.hotspots.length===0;
+    let hotSection;
+    if(showFallback){
+      const all=s.hotspotsAll||[];
+      const homeTop=all.filter(h=>h.track==="装修").sort((a,b)=>b.heat-a.heat).slice(0,15);
+      const hotTop=all.slice().sort((a,b)=>b.heat-a.heat).slice(0,15);
+      hotSection=`
+        <div class="muted" style="margin:2px 0 12px;font-size:12.5px">😶 今日家装 / 避坑热点为空，为你推荐以下高浏览量内容（点「🌐 全部热点」可看完整榜单）：</div>
+        <div class="card" style="margin-bottom:12px"><div class="card-head"><h3>🏠 家装类 · 浏览量 Top 15</h3><span class="sub">按热度排序</span></div>
+          <div class="card-body" style="padding-top:4px"><div class="list">${homeTop.length?homeTop.map(hotRow).join(""):empty("今日暂无家装类热搜")}</div></div></div>
+        <div class="card"><div class="card-head"><h3>🔥 热点话题 · 浏览量 Top 15</h3><span class="sub">全平台按热度</span></div>
+          <div class="card-body" style="padding-top:4px"><div class="list">${hotTop.map(hotRow).join("")}</div></div></div>`;
+    } else {
+      const listBody = s.hotspots.length ? rows : empty("暂无数据，点右上角刷新试试");
+      hotSection=`<div class="card"><div class="card-head"><h3>🔥 热点榜单 Top ${s.hotspots.length}</h3><span class="sub">${themeOn?'自动过滤：家装 / 避坑 / 装修 / 备婚':'显示全部平台热搜'}</span></div>
+        <div class="card-body" style="padding-top:4px"><div class="list">${listBody}</div></div></div>`;
+    }
     el.innerHTML=`
       <div class="page-head"><div><h2>全网热点</h2><p>实时榜单 · 自动匹配你的赛道</p></div>
         <div class="head-actions"><span class="muted" id="hotTime">${upd}</span>${ui().btn("🔄 刷新","ghost","refresh-hot")}</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${platBtns}${themeBtn}</div>
-      <div class="card"><div class="card-head"><h3>🔥 热点榜单 Top ${s.hotspots.length}</h3><span class="sub">${themeOn?'自动过滤：家装 / 避坑 / 装修 / 备婚':'显示全部平台热搜'}</span></div>
-        <div class="card-body" style="padding-top:4px"><div class="list">${listBody}</div></div></div>`;
+      ${hotSection}`;
     App.bindActions(el,{
       "hot-plat":e=>{ const plat=e.currentTarget.dataset.plat; M().refreshHotspots(plat).then(r=>{ if(r.ok){ App.refresh(); ui().toast("已切换至"+(App.HOT_PLATFORMS.find(p=>p.key===plat)||{}).name+"热榜"); } else ui().toast("获取失败："+r.err,"warn"); }); },
       "hot-theme":()=>{ const on=!(store.state.hotMeta&&store.state.hotMeta.themeOnly===false); store.state.hotMeta=Object.assign({},store.state.hotMeta,{themeOnly:!on}); save(); M().refreshHotspots(cur).then(r=>{ if(r.ok){ App.refresh(); ui().toast(on?"已显示全部热点":"已切回仅看家装/避坑"); } else ui().toast("获取失败："+r.err,"warn"); }); },
