@@ -838,52 +838,32 @@ a{color:inherit;text-decoration:none;}
         const content = JSON.stringify(store.state, (k,v)=> (k==="githubToken")?undefined:v, 2);
         const b64content = b64encode(content);
         const msg = "workbench sync " + new Date().toISOString().slice(0,19).replace("T"," ");
-        // 策略：先查文件是否存在，存在就删掉，然后新建（避免所有 sha 冲突）
-        let sha = null;
-        try{
-          const getRes = await fetch(apiUrl(c,true), {headers: headers(c)});
-          if(getRes.ok) sha = (await getRes.json()).sha || null;
-        }catch(e){}
-
-        // 如果文件已存在，先删除（确保后续 PUT 不需要 sha）
-        if(sha){
-          const delRes = await fetch(apiUrl(c,false), {
-            method: "DELETE",
-            headers: Object.assign(headers(c), {"Content-Type":"application/json"}),
-            body: JSON.stringify({message:"sync: replace", sha:sha, branch:c.branch})
-          });
-          // 删除失败也不中断，继续尝试 PUT
-        }
-
-        // 新建文件（不带 sha，因为上面已经删了）
-        const res = await fetch(apiUrl(c,false), {
-          method: "PUT",
-          headers: Object.assign(headers(c), {"Content-Type":"application/json"}),
-          body: JSON.stringify({message:msg, content:b64content, branch:c.branch})
-        });
-        if(res.ok){
-          lastContentHash = hash(content);
-          if(App.ui&&App.ui.toast) App.ui.toast("☁ 已同步到 GitHub");
-          pushing=false; return;
-        }
-        // 如果还是 422（删没成功），用带 sha 的方式再试一次
-        if(res.status===422){
+        // 策略：每次推送前实时获取最新 sha，带 sha 推送；遇冲突重新获取再推
+        async function getSha(){
           try{
-            const getRes2 = await fetch(apiUrl(c,true), {headers: headers(c)});
-            if(getRes2.ok) sha = (await getRes2.json()).sha || null;
+            const r = await fetch(apiUrl(c,true), {headers: headers(c)});
+            if(r.ok) return (await r.json()).sha || null;
           }catch(e){}
-          if(sha){
-            const res2 = await fetch(apiUrl(c,false), {
-              method: "PUT",
-              headers: Object.assign(headers(c), {"Content-Type":"application/json"}),
-              body: JSON.stringify({message:msg, content:b64content, branch:c.branch, sha:sha})
-            });
-            if(res2.ok){
-              lastContentHash = hash(content);
-              if(App.ui&&App.ui.toast) App.ui.toast("☁ 已同步到 GitHub");
-              pushing=false; return;
-            }
-          }
+          return null;
+        }
+        async function doPush(sha){
+          const body = {message:msg, content:b64content, branch:c.branch};
+          if(sha) body.sha = sha;
+          const res = await fetch(apiUrl(c,false), {
+            method: "PUT",
+            headers: Object.assign(headers(c), {"Content-Type":"application/json"}),
+            body: JSON.stringify(body)
+          });
+          return res;
+        }
+        let sha = await getSha();
+        let res = await doPush(sha);
+        if(res.ok){ lastContentHash = hash(content); if(App.ui&&App.ui.toast) App.ui.toast("☁ 已同步到 GitHub"); pushing=false; return; }
+        // 409/422 → 重新获取 sha 再推一次
+        if(res.status===409 || res.status===422){
+          sha = await getSha();
+          res = await doPush(sha);
+          if(res.ok){ lastContentHash = hash(content); if(App.ui&&App.ui.toast) App.ui.toast("☁ 已同步到 GitHub"); pushing=false; return; }
         }
         const errBody = await res.json().catch(()=>({}));
         throw new Error("HTTP " + res.status + (errBody.message?": "+errBody.message:""));
