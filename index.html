@@ -782,7 +782,7 @@ a{color:inherit;text-decoration:none;}
   App.todayStr = todayStr;
   App.TODAY = todayStr();
   App.refreshToday = function(){ App.TODAY = todayStr(); App.todayNum = ts(App.TODAY); return App.TODAY; };
-  App.BUILD = "2026-08-02.20";
+  App.BUILD = "2026-08-02.21";
 
   const clone = (o)=>JSON.parse(JSON.stringify(o));
 
@@ -1201,6 +1201,28 @@ a{color:inherit;text-decoration:none;}
     {key:"weibo", name:"微博"}, {key:"douyin", name:"抖音"},
     {key:"zhihu", name:"知乎"}, {key:"toutiao", name:"头条"},
   ];
+  // 常青家装选题池：当某天连实时热榜都拉不到时，兜底推荐「全网话题最多」的家装/避坑内容
+  // heat 为相对话题热度（用于排序展示），link 为空表示非实时链接
+  App.HOT_HOME_POOL = [
+    {id:"fh1", rank:1, title:"毛坯房验收 9 个必查点", heat:980000, track:"装修", link:""},
+    {id:"fh2", rank:2, title:"装修报价单怎么看才不被坑", heat:962000, track:"避坑", link:""},
+    {id:"fh3", rank:3, title:"小户型收纳 30 个神器", heat:945000, track:"装修", link:""},
+    {id:"fh4", rank:4, title:"新房除醛到底有没有用", heat:921000, track:"装修", link:""},
+    {id:"fh5", rank:5, title:"全屋定制避坑指南", heat:903000, track:"避坑", link:""},
+    {id:"fh6", rank:6, title:"水电改造最容易踩的坑", heat:884000, track:"避坑", link:""},
+    {id:"fh7", rank:7, title:"厨房装修翻车现场盘点", heat:866000, track:"避坑", link:""},
+    {id:"fh8", rank:8, title:"卫生间干湿分离怎么做不踩雷", heat:848000, track:"装修", link:""},
+    {id:"fh9", rank:9, title:"软装搭配 3 个显贵技巧", heat:829000, track:"装修", link:""},
+    {id:"fh10", rank:10, title:"瓷砖怎么选不被商家忽悠", heat:811000, track:"避坑", link:""},
+    {id:"fh11", rank:11, title:"甲醛治理真相：绿植/活性炭有用吗", heat:793000, track:"装修", link:""},
+    {id:"fh12", rank:12, title:"验房师不会告诉你的事", heat:775000, track:"避坑", link:""},
+    {id:"fh13", rank:13, title:"阳台封不封？过来人经验", heat:757000, track:"装修", link:""},
+    {id:"fh14", rank:14, title:"装修合同里的隐藏条款", heat:739000, track:"避坑", link:""},
+    {id:"fh15", rank:15, title:"灯光设计让家显大 10 平", heat:721000, track:"装修", link:""},
+    {id:"fh16", rank:16, title:"智能家居哪些真的值得装", heat:703000, track:"装修", link:""},
+    {id:"fh17", rank:17, title:"装修预算怎么分配最合理", heat:685000, track:"避坑", link:""},
+    {id:"fh18", rank:18, title:"老房改造爆火的底层逻辑", heat:668000, track:"装修", link:""},
+  ];
   // 按标题关键词自动归类到你的赛道，方便「热点→选题」直接带上分类
   App.inferTrack = function(title){
     const t=title||"";
@@ -1316,7 +1338,7 @@ a{color:inherit;text-decoration:none;}
 
     // ---- 热点 -> 创作助手 ----
     hotspotToTopic(id){
-      const all=[...(store.state.hotspotsAll||[]), ...(store.state.hotspots||[])];
+      const all=[...(store.state.hotspotsAll||[]), ...(store.state.hotspots||[]), ...(App.HOT_HOME_POOL||[])];
       const h=all.find(x=>x.id===id); if(!h)return null;
       const t={id:store.uid("tp"),title:h.title,platform:"小红书",track:h.track,status:"未拍摄",script:"",note:"来自热点榜 #"+h.rank};
       store.state.topics.unshift(t); save(); return t;
@@ -1981,19 +2003,26 @@ a{color:inherit;text-decoration:none;}
       </div></div>`;
     const rows = s.hotspots.map(hotRow).join("");
     const upd = meta.updated ? ("更新于 "+new Date(meta.updated).toLocaleString("zh-CN")) : "尚未更新（打开自动拉取）";
-    // 主题过滤后为空 → 兜底推荐：家装类浏览量 Top 15 + 热点话题浏览量 Top 15
-    const showFallback = themeOn && s.hotspots.length===0;
+    // 兜底推荐分两级：主题过滤为空但当日有榜单 → 家装/热点 Top15；当日连榜单都没有 → 常青家装选题池
     let hotSection;
-    if(showFallback){
+    if(themeOn && s.hotspots.length===0){
       const all=s.hotspotsAll||[];
-      const homeTop=all.filter(h=>h.track==="装修").sort((a,b)=>b.heat-a.heat).slice(0,15);
-      const hotTop=all.slice().sort((a,b)=>b.heat-a.heat).slice(0,15);
-      hotSection=`
-        <div class="muted" style="margin:2px 0 12px;font-size:12.5px">😶 今日家装 / 避坑热点为空，为你推荐以下高浏览量内容（点「🌐 全部热点」可看完整榜单）：</div>
-        <div class="card" style="margin-bottom:12px"><div class="card-head"><h3>🏠 家装类 · 浏览量 Top 15</h3><span class="sub">按热度排序</span></div>
-          <div class="card-body" style="padding-top:4px"><div class="list">${homeTop.length?homeTop.map(hotRow).join(""):empty("今日暂无家装类热搜")}</div></div></div>
-        <div class="card"><div class="card-head"><h3>🔥 热点话题 · 浏览量 Top 15</h3><span class="sub">全平台按热度</span></div>
-          <div class="card-body" style="padding-top:4px"><div class="list">${hotTop.map(hotRow).join("")}</div></div></div>`;
+      if(all.length){
+        const homeTop=all.filter(h=>h.track==="装修").sort((a,b)=>b.heat-a.heat).slice(0,15);
+        const hotTop=all.slice().sort((a,b)=>b.heat-a.heat).slice(0,15);
+        hotSection=`
+          <div class="muted" style="margin:2px 0 12px;font-size:12.5px">😶 今日家装 / 避坑热点为空，为你推荐以下高浏览量内容（点「🌐 全部热点」可看完整榜单）：</div>
+          <div class="card" style="margin-bottom:12px"><div class="card-head"><h3>🏠 家装类 · 浏览量 Top 15</h3><span class="sub">按热度排序</span></div>
+            <div class="card-body" style="padding-top:4px"><div class="list">${homeTop.length?homeTop.map(hotRow).join(""):empty("今日暂无家装类热搜")}</div></div></div>
+          <div class="card"><div class="card-head"><h3>🔥 热点话题 · 浏览量 Top 15</h3><span class="sub">全平台按热度</span></div>
+            <div class="card-body" style="padding-top:4px"><div class="list">${hotTop.map(hotRow).join("")}</div></div></div>`;
+      } else {
+        const pool=(App.HOT_HOME_POOL||[]).slice().sort((a,b)=>b.heat-a.heat);
+        hotSection=`
+          <div class="muted" style="margin:2px 0 12px;font-size:12.5px">📡 今日实时热榜暂未获取到，为你推荐「全网话题最多」的常青家装选题（点「🔄 刷新」可重试实时榜单）：</div>
+          <div class="card"><div class="card-head"><h3>🏠 全网话题最多的家装类 · 常青选题</h3><span class="sub">按话题热度排序</span></div>
+            <div class="card-body" style="padding-top:4px"><div class="list">${pool.map(hotRow).join("")}</div></div></div>`;
+      }
     } else {
       const listBody = s.hotspots.length ? rows : empty("暂无数据，点右上角刷新试试");
       hotSection=`<div class="card"><div class="card-head"><h3>🔥 热点榜单 Top ${s.hotspots.length}</h3><span class="sub">${themeOn?'自动过滤：家装 / 避坑 / 装修 / 备婚':'显示全部平台热搜'}</span></div>
