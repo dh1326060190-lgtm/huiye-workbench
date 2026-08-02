@@ -1,5 +1,5 @@
 {
-  "currentPage": "setting",
+  "currentPage": "wedding",
   "settings": {
     "userName": "设计师 · 绘野",
     "theme": "green",
@@ -247,7 +247,7 @@
     }
   ],
   "wedding": {
-    "weddingDate": "2026-12-20",
+    "weddingDate": "2026-09-28",
     "totalBudget": 200000,
     "groups": {
       "婚房装修 & 收房验收": [
