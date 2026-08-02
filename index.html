@@ -297,6 +297,11 @@ a{color:inherit;text-decoration:none;}
 .cal-cell.done::after{content:"";position:absolute;bottom:5px;width:5px;height:5px;border-radius:50%;background:var(--green-600);}
 .cal-cell.over::after{background:var(--danger);}
 .cal-cell .dot{position:absolute;bottom:5px;width:5px;height:5px;border-radius:50%;}
+.cal-cell[data-action]{cursor:pointer;transition:transform .08s,box-shadow .08s;}
+.cal-cell[data-action]:active{transform:scale(.92);}
+.cal-cell.sel{box-shadow:0 0 0 2px var(--green-500) inset;background:var(--green-050);color:var(--green-800);font-weight:700;}
+.cal-cell.nav{background:var(--surface-2);border:1px solid var(--border,#e2e8f0);aspect-ratio:auto;width:34px;height:34px;font-size:18px;color:var(--text-2);border-radius:9px;cursor:pointer;}
+.filter-banner{display:flex;align-items:center;gap:8px;justify-content:space-between;background:var(--green-050);border:1px solid var(--green-500);color:var(--green-800);padding:8px 12px;border-radius:10px;margin-bottom:10px;font-size:13px;}
 
 /* ---------- Modal ---------- */
 .modal-mask{position:fixed;inset:0;background:rgba(20,52,43,.42);backdrop-filter:blur(2px);display:grid;place-items:center;z-index:50;animation:fade .15s;}
@@ -776,7 +781,7 @@ a{color:inherit;text-decoration:none;}
   App.todayStr = todayStr;
   App.TODAY = todayStr();
   App.refreshToday = function(){ App.TODAY = todayStr(); App.todayNum = ts(App.TODAY); return App.TODAY; };
-  App.BUILD = "2026-08-02.18";
+  App.BUILD = "2026-08-02.19";
 
   const clone = (o)=>JSON.parse(JSON.stringify(o));
 
@@ -1018,9 +1023,17 @@ a{color:inherit;text-decoration:none;}
       const t = store.state.todayTasks;
       const total = t.length;
       const done = t.filter(x=>x.status==="已完成").length;
-      const overdue = t.filter(x=>x.status==="逾期").length;
+      // 逾期是「展示状态」而非存储状态：due 早于今天且未完成才算逾期
+      const overdue = t.filter(x=>App.calc.taskDisplayStatus(x)==="逾期").length;
       const rate = total? Math.round(done/total*100):0;
       return {total,done,overdue,rate};
+    },
+    // 本月健康打卡率：按当前月份的历史记录实时计算；本月尚无记录时返回 null（沿用基线值）
+    dietMonthRate(){
+      const ym = App.TODAY.slice(0,7);
+      const hs = (store.state.diet.history||[]).filter(h=>h.date && h.date.slice(0,7)===ym);
+      if(!hs.length) return null;
+      return Math.round(hs.reduce((s,h)=>s+(h.rate||0),0)/hs.length*100);
     },
     wedding(){
       const w = store.state.wedding;
@@ -1420,6 +1433,23 @@ a{color:inherit;text-decoration:none;}
     addDietPhoto(meal){ const m=store.state.diet.today.meals[meal]; if(m){m.done=true;m.photo="📷";m.kcal=m.kcal||420;} save(); },
     setDietTarget(v){ store.state.diet.today.target=+v||0; save(); },
     deleteDietHistory(date){ store.state.diet.history=store.state.diet.history.filter(h=>h.date!==date); save(); },
+    // 跨天自动滚动：打开饮食页时若存储日期不是今天，先把昨天归档进历史，再重置为今天
+    rollDietDay(){
+      const d=store.state.diet;
+      const prev=d.today||{date:null,meals:{},target:1800};
+      if(prev.date===App.TODAY) return false;
+      const meals=prev.meals||{}; const keys=Object.keys(meals);
+      const anyDone=keys.some(k=>meals[k]&&meals[k].done);
+      if(prev.date && anyDone){
+        const kcal=keys.reduce((s,k)=>s+((meals[k]&&meals[k].kcal)||0),0);
+        const doneCount=keys.filter(k=>meals[k]&&meals[k].done).length;
+        const rate=keys.length?doneCount/keys.length:0;
+        d.history=([{date:prev.date,kcal,rate}]).concat((d.history||[]).filter(h=>h.date!==prev.date));
+      }
+      const newMeals={}; keys.forEach(k=>{ newMeals[k]={done:false,kcal:0,photo:null}; });
+      d.today={date:App.TODAY,meals:newMeals,target:prev.target!=null?prev.target:1800};
+      save(); return true;
+    },
 
     // ---- 心情日记 ----
     addMood(v){ store.state.moods.unshift({id:store.uid("m"),date:v.date,mood:v.mood,weather:v.weather,text:v.text}); save(); },
@@ -1707,18 +1737,26 @@ a{color:inherit;text-decoration:none;}
   function p_today(el){
     const s=S(), c=C(), st=c.todayStats();
     App.refreshToday();                                   // 刷新为真实当前日期
-    // 日历：按当前真实年月渲染，自动高亮今天
-    const TH=App.TODAY, y=+TH.slice(0,4), m=+TH.slice(5,7)-1, todayD=+TH.slice(8,10);
-    const wd=["日","一","二","三","四","五","六"][new Date(y,m,todayD).getDay()];
+    // 视图状态：当前显示的月份 + 选中的筛选日期（持久在 App 上，不进存储）
+    if(!App.todayViewMonth) App.todayViewMonth = App.TODAY.slice(0,7);
+    const selDate = App.todayViewDate || null;            // null = 显示全部
+    const TH=App.TODAY;
+    const [vy,vm] = App.todayViewMonth.split("-").map(Number);
+    const y=vy, m=vm-1;
+    const todayD=+TH.slice(8,10), inThisMonth = TH.slice(0,7)===App.todayViewMonth;
+    const wd=["日","一","二","三","四","五","六"][new Date(+TH.slice(0,4),+TH.slice(5,7)-1,+TH.slice(8,10)).getDay()];
     const first=new Date(y,m,1).getDay(), dim=new Date(y,m+1,0).getDate();
-    const monthPrefix=TH.slice(0,7);
+    const monthPrefix=App.todayViewMonth;
     const dateMap={};
     s.todayTasks.forEach(t=>{ const d=String(t.due).slice(0,10); const ds=c.taskDisplayStatus(t); if(!dateMap[d])dateMap[d]={done:0,over:0}; if(ds==="已完成")dateMap[d].done++; else if(ds==="逾期")dateMap[d].over++; });
     let cells=""; for(let i=0;i<first;i++) cells+=`<div class="cal-cell muted"></div>`;
-    for(let d=1;d<=dim;d++){ const ds=`${monthPrefix}-${String(d).padStart(2,"0")}`; const cls=[]; if(d===todayD)cls.push("today"); const info=dateMap[ds]; if(info){ if(info.done)cls.push("done"); if(info.over)cls.push("over"); } cells+=`<div class="cal-cell ${cls.join(" ")}">${d}</div>`; }
+    for(let d=1;d<=dim;d++){ const ds=`${monthPrefix}-${String(d).padStart(2,"0")}`; const cls=[]; if(inThisMonth && d===todayD)cls.push("today"); const info=dateMap[ds]; if(info){ if(info.done)cls.push("done"); if(info.over)cls.push("over"); } const sel=(selDate===ds)?" sel":""; cells+=`<div class="cal-cell ${cls.join(" ")}${sel}" data-action="cal-day" data-date="${ds}">${d}</div>`; }
     const dow=["日","一","二","三","四","五","六"].map(x=>`<div class="dow">${x}</div>`).join("");
+    const navBtns=`<div class="cal-head"><button class="cal-cell nav" data-action="cal-prev">‹</button><h4 style="font-size:14px;font-weight:700">${y}年${m+1}月</h4><button class="cal-cell nav" data-action="cal-next">›</button></div>`;
 
-    const rows=s.todayTasks.map(t=>{ const ds=c.taskDisplayStatus(t);
+    // 任务列表：选中日期时按 due 日期过滤
+    const list = selDate ? s.todayTasks.filter(t=>String(t.due).slice(0,10)===selDate) : s.todayTasks;
+    const rows=list.map(t=>{ const ds=c.taskDisplayStatus(t);
       return `<div class="row" data-search="${App.esc(t.title+t.cat)}">
         <div class="main"><div class="title">${App.esc(t.title)} ${ui().catTag(t.cat)}</div>
         <div class="meta"><span>⏰ ${App.esc(t.due)}</span><span>🔔 ${t.remind?"已开启":"关闭"}</span></div></div>
@@ -1730,6 +1768,10 @@ a{color:inherit;text-decoration:none;}
           <button class="link danger" data-action="del-task" data-id="${t.id}">删除</button>
         </div></div>`; }).join("");
 
+    const filterBanner = selDate
+      ? `<div class="filter-banner">📅 已筛选 <b>${selDate}</b> 的任务（${list.length} 项）${ui().btn("显示全部","ghost","cal-clear")}</div>`
+      : "";
+
     el.innerHTML=`
       <div class="page-head"><div><h2>今日计划</h2><p>${TH} · 星期${wd} · 把今天过好</p></div></div>
       <div class="stat-grid">
@@ -1739,11 +1781,11 @@ a{color:inherit;text-decoration:none;}
         ${ui().statCard({label:"逾期任务",icon:"⏰",value:st.overdue,unit:"项",warn:st.overdue>0})}
       </div>
       <div class="split">
-        <div class="card"><div class="card-head"><h3>📅 日历 · ${y}年${m+1}月</h3></div>
-          <div class="card-body"><div class="calendar"><div class="cal-grid">${dow}${cells}</div>
-          <div class="meta" style="margin-top:12px;color:var(--text-3);font-size:12px">● 绿点=已完成 · 红点=逾期 · 今日高亮</div></div></div></div>
-        <div class="card"><div class="card-head"><h3>今日任务</h3><span class="sub">${st.total} 项</span></div>
-          <div class="card-body" style="padding-top:4px"><div class="list">${rows||empty("还没有任务，点击下方新增")}</div></div></div>
+        <div class="card"><div class="card-head"><h3>📅 日历</h3></div>
+          <div class="card-body"><div class="calendar">${navBtns}<div class="cal-grid">${dow}${cells}</div>
+          <div class="meta" style="margin-top:12px;color:var(--text-3);font-size:12px">● 绿点=已完成 · 红点=逾期 · 今日高亮 · 点击日期可筛选</div></div></div></div>
+        <div class="card"><div class="card-head"><h3>${selDate?selDate+" 的任务":"今日任务"}</h3><span class="sub">${list.length} 项</span></div>
+          <div class="card-body" style="padding-top:4px">${filterBanner}<div class="list">${rows||empty(selDate?"这一天没有任务":"还没有任务，点击下方新增")}</div></div></div>
       </div>
       <div class="head-actions" style="margin-top:18px">
         ${ui().btn("🤖 智能分配","primary","auto-plan")}
@@ -1763,6 +1805,10 @@ a{color:inherit;text-decoration:none;}
       "quick-tomorrow":()=>ui().formModal({title:"明日计划快速录入",okText:"批量添加",fields:[
         {name:"text",label:"待办内容（每行一条）",type:"textarea",required:true,placeholder:"09:00 晨跑\n14:00 客户会议"}],
         onSubmit:v=>{ const lines=v.text.split("\n").map(x=>x.trim()).filter(Boolean); lines.forEach(l=>M().quickAddTomorrow(l)); App.refresh(); ui().toast(`已添加 ${lines.length} 条明日计划`); }}),
+      "cal-day":e=>{ const ds=e.currentTarget.dataset.date; App.todayViewDate = (App.todayViewDate===ds)? null : ds; App.refresh(); },
+      "cal-prev":()=>{ const [yy,mm]=App.todayViewMonth.split("-").map(Number); const d=new Date(yy,mm-2,1); App.todayViewMonth=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; App.refresh(); },
+      "cal-next":()=>{ const [yy,mm]=App.todayViewMonth.split("-").map(Number); const d=new Date(yy,mm,1); App.todayViewMonth=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; App.refresh(); },
+      "cal-clear":()=>{ App.todayViewDate=null; App.refresh(); },
     });
   }
   function openTaskModal(id){
@@ -2221,7 +2267,9 @@ a{color:inherit;text-decoration:none;}
 
   /* ---------------- 8. 饮食打卡 ---------------- */
   function p_diet(el){
-    const s=S(), d=s.diet, t=d.today;
+    const s=S(), d=s.diet;
+    const rolled = M().rollDietDay();           // 跨天自动滚动到今天
+    const t=d.today;
     const meals=["早餐","午餐","晚餐"].map(m=>{ const x=t.meals[m];
       return `<div class="card"><div class="card-head"><h3>${m}</h3>${x.done?ui().tag("已完成"):ui().tag("待办")}</div>
         <div class="card-body" style="text-align:center">
@@ -2231,20 +2279,23 @@ a{color:inherit;text-decoration:none;}
           <button class="btn btn-ghost btn-sm" data-action="meal-photo" data-m="${m}">📷 上传照片</button>
         </div></div>`; }).join("");
     const totalK=Object.values(t.meals).reduce((a,x)=>a+(x.done?x.kcal:0),0);
+    const mr=App.calc.dietMonthRate();
+    const mrVal = (mr==null)? Math.round((d.monthRate||0)*100) : mr;
     const hist=d.history.map(h=>`<div class="row"><div class="main"><div class="title">${h.date}</div><div class="meta"><span>🔥 ${h.kcal} kcal</span><span>打卡率 ${Math.round(h.rate*100)}%</span></div></div><div class="ops"><button class="link danger" data-action="diet-del-hist" data-date="${App.esc(h.date)}">删除</button></div>${ui().tag(h.rate>=1?"已完成":"进行中")}</div>`).join("");
 
     el.innerHTML=`
-      <div class="page-head"><div><h2>🍱 饮食打卡</h2><p>每日三餐 · 热量管理</p></div>
+      <div class="page-head"><div><h2>🍱 饮食打卡</h2><p>📅 ${App.TODAY} · 每日三餐 · 热量管理</p></div>
         <div class="head-actions">${ui().btn("🎯 设置目标热量","ghost","diet-target")}</div></div>
       <div class="stat-grid">
         ${ui().statCard({label:"今日已摄入",icon:"🔥",value:totalK,unit:"kcal",accent:true})}
         ${ui().statCard({label:"目标热量",icon:"🎯",value:t.target,unit:"kcal"})}
         ${ui().statCard({label:"剩余额度",icon:"⚖️",value:Math.max(t.target-totalK,0),unit:"kcal"})}
-        ${ui().statCard({label:"本月健康打卡率",icon:"📅",value:Math.round(d.monthRate*100),unit:"%",sub:"坚持就是胜利"})}
+        ${ui().statCard({label:"本月健康打卡率",icon:"📅",value:mrVal,unit:"%",sub:"坚持就是胜利"})}
       </div>
       <div class="grid-3">${meals}</div>
       <div class="section-title"><span class="bar"></span>历史打卡</div>
       <div class="card"><div class="card-body" style="padding-top:4px"><div class="list">${hist}</div></div></div>`;
+    if(rolled) ui().toast("已切换到今天（"+App.TODAY+"）的饮食打卡", "ok", 2000);
     App.bindActions(el,{
       "meal":e=>{ M().toggleMeal(e.currentTarget.dataset.m); App.refresh(); },
       "meal-photo":e=>{ M().addDietPhoto(e.currentTarget.dataset.m); App.refresh(); ui().toast("照片已记录（演示）"); },
