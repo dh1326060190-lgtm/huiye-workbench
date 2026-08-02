@@ -845,19 +845,36 @@ a{color:inherit;text-decoration:none;}
             sha = fileData.sha || null;
           }
         }catch(e){ /* 文件可能不存在 */ }
-        // PUT 推送
-        const body = {
-          message: "workbench sync " + new Date().toISOString().slice(0,19).replace("T"," "),
-          content: b64encode(content),
-          branch: c.branch
-        };
-        if(sha) body.sha = sha;
-        const res = await fetch(apiUrl(c,false), {
-          method: "PUT",
-          headers: Object.assign(headers(c), {"Content-Type":"application/json"}),
-          body: JSON.stringify(body)
-        });
-        if(!res.ok){
+        // PUT 推送（带 409 重试：sha 不匹配时重新获取再推一次）
+        for(let attempt=0; attempt<2; attempt++){
+          const body = {
+            message: "workbench sync " + new Date().toISOString().slice(0,19).replace("T"," "),
+            content: b64encode(content),
+            branch: c.branch
+          };
+          if(sha) body.sha = sha;
+          const res = await fetch(apiUrl(c,false), {
+            method: "PUT",
+            headers: Object.assign(headers(c), {"Content-Type":"application/json"}),
+            body: JSON.stringify(body)
+          });
+          if(res.ok){
+            lastContentHash = hash(content);
+            lastSha = sha;
+            if(App.ui&&App.ui.toast) App.ui.toast("☁ 已同步到 GitHub");
+            pushing=false; return;
+          }
+          if(res.status===409 && attempt===0){
+            // sha 不匹配，重新获取最新 sha 再重试一次
+            try{
+              const getRes2 = await fetch(apiUrl(c,true), {headers: headers(c)});
+              if(getRes2.ok){
+                const fd = await getRes2.json();
+                sha = fd.sha || null;
+              }
+            }catch(e){}
+            continue;
+          }
           const errBody = await res.json().catch(()=>({}));
           throw new Error("HTTP " + res.status + (errBody.message?": "+errBody.message:""));
         }
