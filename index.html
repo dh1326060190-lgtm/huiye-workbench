@@ -855,14 +855,16 @@ a{color:inherit;text-decoration:none;}
           });
           return res;
         }
-        // 最多重试5次，每次重新获取最新 sha（解决多设备并发冲突）
+        // 最多重试8次，每次重新获取最新 sha（解决多设备并发冲突）
+        // 加入随机抖动，避免多设备同时重试造成死锁
         let res=null;
-        for(let i=0; i<5; i++){
+        for(let i=0; i<8; i++){
           const sha = await getSha();
           res = await doPush(sha);
           if(res.ok){ lastContentHash = hash(content); if(App.ui&&App.ui.toast) App.ui.toast("☁ 已同步到 GitHub"); pushing=false; return; }
           if(res.status===409 || res.status===422){
-            await new Promise(r=>setTimeout(r, 150*i)); // 退避等待
+            const jitter = 200*i + Math.floor(Math.random()*300); // 退避+随机抖动
+            await new Promise(r=>setTimeout(r, jitter));
             continue; // 重新获取 sha 再推
           }
           break; // 其他错误直接跳出
