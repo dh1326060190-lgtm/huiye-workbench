@@ -776,7 +776,7 @@ a{color:inherit;text-decoration:none;}
   App.todayStr = todayStr;
   App.TODAY = todayStr();
   App.refreshToday = function(){ App.TODAY = todayStr(); App.todayNum = ts(App.TODAY); return App.TODAY; };
-  App.BUILD = "2026-08-02.16";
+  App.BUILD = "2026-08-02.17";
 
   const clone = (o)=>JSON.parse(JSON.stringify(o));
 
@@ -1182,30 +1182,30 @@ a{color:inherit;text-decoration:none;}
   // ====================================================
   //  全网热点：拉取真实每日热榜（60s 开源接口，已验证支持跨域）
   // ====================================================
-  const HOT_API = "https://60s.viki.moe/v2/";
-  const HOT_PLATFORMS = [
+  App.HOT_API = "https://60s.viki.moe/v2/";
+  App.HOT_PLATFORMS = [
     {key:"weibo", name:"微博"}, {key:"douyin", name:"抖音"},
     {key:"zhihu", name:"知乎"}, {key:"toutiao", name:"头条"},
   ];
   // 按标题关键词自动归类到你的赛道，方便「热点→选题」直接带上分类
-  function inferTrack(title){
+  App.inferTrack = function(title){
     const t=title||"";
     if(/婚|备婚|结婚|婚礼|嫁|囍|钻戒|婚纱|蜜月|喜糖|请柬|四大金刚/.test(t)) return "备婚";
     if(/装修|毛坯|户型|家居|收纳|甲醛|瓷砖|水电|家电|新房|验房|软装|吊顶/.test(t)) return "装修";
     if(/本地|城市|探店|周边|旅行|旅游|同城|打卡|美食|景点|city\s?walk/i.test(t)) return "本地生活";
     return "热点";
-  }
-  async function fetchHot(platform){
-    const res = await fetch(HOT_API + platform, {headers:{"Accept":"application/json"}});
+  };
+  App.fetchHot = async function(platform){
+    const res = await fetch(App.HOT_API + platform, {headers:{"Accept":"application/json"}});
     if(!res.ok) throw new Error("HTTP "+res.status);
     const j = await res.json();
     if(!j || j.code!==200 || !Array.isArray(j.data)) throw new Error("数据为空");
     return j.data.slice(0,20).map((x,i)=>({
       id:"h"+(i+1), rank:i+1, title:x.title,
       heat:(x.hot_value!=null?x.hot_value:(x.hot!=null?x.hot:(x.heat||0))),
-      track:inferTrack(x.title), link:x.link||""
+      track:App.inferTrack(x.title), link:x.link||""
     }));
-  }
+  };
 
   // ====================================================
   //  联动 mutations
@@ -1301,7 +1301,7 @@ a{color:inherit;text-decoration:none;}
     async refreshHotspots(platform){
       platform = platform || (store.state.hotMeta && store.state.hotMeta.platform) || "weibo";
       try{
-        const list = await fetchHot(platform);
+        const list = await App.fetchHot(platform);
         store.state.hotspots = list;
         store.state.hotMeta = {updated:new Date().toISOString(), platform};
         save();
@@ -1901,13 +1901,13 @@ a{color:inherit;text-decoration:none;}
     const meta = s.hotMeta || {updated:"", platform:"weibo"};
     const cur = meta.platform || "weibo";
     // 每天自动拉取一次真实热榜（当天已更新则跳过，避免重复请求）
-    if((meta.updated||"").slice(0,10) !== App.TODAY){
+      if((meta.updated||"").slice(0,10) !== App.TODAY){
       M().refreshHotspots(cur).then(r=>{
-        if(r.ok){ App.refresh(); ui().toast("已更新今日"+(HOT_PLATFORMS.find(p=>p.key===r.platform)||{}).name+"热榜"); }
+        if(r.ok){ App.refresh(); ui().toast("已更新今日"+(App.HOT_PLATFORMS.find(p=>p.key===r.platform)||{}).name+"热榜"); }
         else { ui().toast("热点获取失败："+r.err+"（仍显示上次数据）","warn",3500); }
       });
     }
-    const platBtns = HOT_PLATFORMS.map(p=>`<button class="btn btn-sm ${p.key===cur?'btn-primary':'btn-ghost'}" data-action="hot-plat" data-plat="${p.key}">${p.name}</button>`).join("");
+    const platBtns = App.HOT_PLATFORMS.map(p=>`<button class="btn btn-sm ${p.key===cur?'btn-primary':'btn-ghost'}" data-action="hot-plat" data-plat="${p.key}">${p.name}</button>`).join("");
     const rows=s.hotspots.map(h=>`<div class="row" data-search="${App.esc(h.title)}">
       <div class="main" style="display:flex;gap:12px;align-items:center">
         <span style="font-size:18px;font-weight:800;color:${h.rank<=3?'var(--danger)':'var(--text-3)'};min-width:22px">${h.rank}</span>
@@ -1926,8 +1926,8 @@ a{color:inherit;text-decoration:none;}
       <div class="card"><div class="card-head"><h3>🔥 热点榜单 Top ${s.hotspots.length}</h3><span class="sub">自动匹配：装修 / 备婚 / 本地生活</span></div>
         <div class="card-body" style="padding-top:4px"><div class="list">${rows||empty("暂无数据，点右上角刷新试试")}</div></div></div>`;
     App.bindActions(el,{
-      "hot-plat":e=>{ const plat=e.currentTarget.dataset.plat; M().refreshHotspots(plat).then(r=>{ if(r.ok){ App.refresh(); ui().toast("已切换至"+(HOT_PLATFORMS.find(p=>p.key===plat)||{}).name+"热榜"); } else ui().toast("获取失败："+r.err,"warn"); }); },
-      "refresh-hot":()=>{ const t=document.getElementById("hotTime"); if(t)t.textContent="更新中…"; M().refreshHotspots(cur).then(r=>{ if(r.ok){ App.refresh(); ui().toast("已更新今日"+(HOT_PLATFORMS.find(p=>p.key===r.platform)||{}).name+"热榜"); } else ui().toast("热点获取失败："+r.err,"warn"); }); },
+      "hot-plat":e=>{ const plat=e.currentTarget.dataset.plat; M().refreshHotspots(plat).then(r=>{ if(r.ok){ App.refresh(); ui().toast("已切换至"+(App.HOT_PLATFORMS.find(p=>p.key===plat)||{}).name+"热榜"); } else ui().toast("获取失败："+r.err,"warn"); }); },
+      "refresh-hot":()=>{ const t=document.getElementById("hotTime"); if(t)t.textContent="更新中…"; M().refreshHotspots(cur).then(r=>{ if(r.ok){ App.refresh(); ui().toast("已更新今日"+(App.HOT_PLATFORMS.find(p=>p.key===r.platform)||{}).name+"热榜"); } else ui().toast("热点获取失败："+r.err,"warn"); }); },
       "gen-from-hot":e=>{ const id=e.currentTarget.dataset.id; const t=M().hotspotToTopic(id); if(!t){ui().toast("生成失败");return;} const sc=M().genScript(t.id); App.refresh(); if(sc){ ui().formModal({title:"🎬 已生成 · "+t.title,size:"lg",okText:"关闭",fields:[{name:"_p",label:"",type:"textarea",value:sc.content}],onSubmit:(vv,cl)=>cl()}); } ui().toast("已生成选题《"+(t&&t.title)+"》并附拍摄+剪辑脚本"); },
       "add-from-hot":e=>{ const t=M().hotspotToTopic(e.currentTarget.dataset.id); App.refresh(); ui().toast("已加入我的选题库"); },
     });
