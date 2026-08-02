@@ -771,7 +771,7 @@ a{color:inherit;text-decoration:none;}
   const App = (window.App = window.App || {});
   const KEY = "designer_os_state_v1";
   App.TODAY = "2026-07-31";
-  App.BUILD = "2026-08-02.11";
+  App.BUILD = "2026-08-02.12";
 
   const clone = (o)=>JSON.parse(JSON.stringify(o));
 
@@ -1351,6 +1351,7 @@ a{color:inherit;text-decoration:none;}
     // ---- 每周复盘 ----
     addReview(v){ store.state.reviews.unshift({id:store.uid("rv"),week:v.week,done:[],undone:[],problem:"",plan:[],goal:[]}); save(); },
     updateReview(id,v){ const r=store.state.reviews.find(x=>x.id===id); if(r)Object.assign(r,v); save(); },
+    deleteReview(id){ store.state.reviews=store.state.reviews.filter(x=>x.id!==id); save(); },
 
     // ---- 短视频复盘 ----
     addSvReview(v){
@@ -2154,7 +2155,7 @@ a{color:inherit;text-decoration:none;}
     const cards=s.reviews.map(r=>{
       const li=(arr,label)=>`<div style="margin:6px 0"><b style="color:var(--text-2);font-size:12.5px">${label}</b><ul style="margin:4px 0 0 18px;color:var(--text-2)">${(arr&&arr.length)?arr.map(x=>`<li>${App.esc(x)}</li>`).join(""):"<li class='muted'>—</li>"}</ul></div>`;
       return `<div class="card" style="margin-bottom:14px"><div class="card-head"><h3>📆 ${App.esc(r.week)}</h3>
-        <div class="ops"><button class="link" data-action="rv-edit" data-id="${r.id}">编辑</button></div></div>
+        <div class="ops"><button class="link" data-action="rv-edit" data-id="${r.id}">编辑</button><button class="link danger" data-action="rv-del" data-id="${r.id}">删除</button></div></div>
         <div class="card-body">${li(r.done,"本周完成")}${li(r.undone,"本周未完成")}${li([r.problem],"问题总结")}${li(r.plan,"下周改进")}${li(r.goal,"下周目标")}</div></div>`; }).join("");
     el.innerHTML=`
       <div class="page-head"><div><h2>🔁 每周复盘</h2><p>固定模板 · 持续迭代</p></div>
@@ -2176,6 +2177,7 @@ a{color:inherit;text-decoration:none;}
           {name:"goal",label:"下周目标",type:"textarea",value:join(r.goal)}],
           onSubmit:v=>{ const sp=x=>x.split("\n").map(z=>z.trim()).filter(Boolean);
             M().updateReview(r.id,{done:sp(v.done),undone:sp(v.undone),problem:v.problem,plan:sp(v.plan),goal:sp(v.goal)}); App.refresh(); ui().toast("已保存"); }}); },
+      "rv-del":e=>{ const id=e.currentTarget.dataset.id; const r=s.reviews.find(x=>x.id===id); ui().confirm({text:"删除该周复盘"+(r?"「"+r.week+"」":"")+"？此操作不可撤销",onOk:()=>{ M().deleteReview(id); App.refresh(); ui().toast("已删除"); }}); },
     });
   }
 
