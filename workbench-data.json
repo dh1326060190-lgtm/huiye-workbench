@@ -1,0 +1,826 @@
+{
+  "currentPage": "setting",
+  "settings": {
+    "userName": "设计师 · Lin",
+    "theme": "green",
+    "remindTask": true,
+    "remindSaving": true,
+    "remindWedding": true,
+    "autoBackup": true,
+    "lockEnabled": false,
+    "ghLogin": "",
+    "ghRepo": "dh1326060190-lgtm/huiye-workbench",
+    "ghBranch": "master",
+    "ghPath": "workbench-data.json",
+    "cloudSync": true
+  },
+  "todayTasks": [
+    {
+      "id": "t1",
+      "title": "确认婚宴酒店菜单",
+      "cat": "备婚",
+      "due": "2026-07-30 14:00",
+      "status": "进行中",
+      "note": "核对忌口与桌数",
+      "remind": true,
+      "doneAt": null
+    },
+    {
+      "id": "t2",
+      "title": "收房验收预约",
+      "cat": "装修",
+      "due": "2026-07-30 10:30",
+      "status": "已完成",
+      "note": "物业陪同",
+      "remind": true,
+      "doneAt": "2026-07-30 11:10"
+    },
+    {
+      "id": "t3",
+      "title": "公众号周更文章排版",
+      "cat": "自媒体",
+      "due": "2026-07-30 18:00",
+      "status": "待办",
+      "note": "装修避坑合集",
+      "remind": false,
+      "doneAt": null
+    },
+    {
+      "id": "t4",
+      "title": "备婚预算台账复核",
+      "cat": "备婚",
+      "due": "2026-07-28 20:00",
+      "status": "逾期",
+      "note": "超支预警",
+      "remind": true,
+      "doneAt": null
+    },
+    {
+      "id": "t5",
+      "title": "采购喜糖样品",
+      "cat": "备婚",
+      "due": "2026-07-30 16:00",
+      "status": "待办",
+      "note": "对比 3 家",
+      "remind": true,
+      "doneAt": null
+    },
+    {
+      "id": "t6",
+      "title": "设计稿终稿交付",
+      "cat": "工作",
+      "due": "2026-07-30 17:30",
+      "status": "进行中",
+      "note": "客户评审",
+      "remind": true,
+      "doneAt": null
+    }
+  ],
+  "topics": [
+    {
+      "id": "tp1",
+      "title": "毛坯房验收 9 个必查点",
+      "platform": "小红书",
+      "track": "验房",
+      "status": "已发布",
+      "script": "",
+      "note": ""
+    },
+    {
+      "id": "tp2",
+      "title": "婚房收纳 30 个神仙好物",
+      "platform": "抖音",
+      "track": "备婚",
+      "status": "已拍摄",
+      "script": "",
+      "note": ""
+    },
+    {
+      "id": "tp3",
+      "title": "本地婚礼跟拍避坑指南",
+      "platform": "小红书",
+      "track": "本地生活",
+      "status": "未拍摄",
+      "script": "",
+      "note": ""
+    },
+    {
+      "id": "tp4",
+      "title": "装修报价单怎么看才不被坑",
+      "platform": "抖音",
+      "track": "装修",
+      "status": "未拍摄",
+      "script": "",
+      "note": ""
+    }
+  ],
+  "scripts": [
+    {
+      "id": "sc1",
+      "title": "毛坯房验收口播脚本",
+      "createdAt": "2026-07-22 09:12",
+      "status": "已完成",
+      "content": "【开头钩子】花几十万买房，收房这 10 分钟没验好，后面全是坑！\n\n【9 个必查点】\n1. 墙面空鼓：空鼓率超 5% 必须整改\n2. 门窗密闭：关窗听隔音、推拉是否顺滑\n3. 下水通畅：每个地漏倒一桶水看流速\n4. 电路点位：对照图纸数插座，缺一个后期只能明装\n5. 防水层：卫生间闭水 24 小时再看楼下\n6. 层高净高：激光测，低于 2.6m 吊顶吃亏\n7. 管道打压：给水 0.8MPa 保压 30 分钟不掉\n8. 燃气预留：厨房是否留接口和排烟\n9. 裂缝渗漏：墙角顶棚有无水渍\n\n【结尾引导】收好这份清单，关注我，下期讲怎么看装修报价单不踩坑。"
+    },
+    {
+      "id": "sc2",
+      "title": "备婚收纳好物脚本",
+      "createdAt": "2026-07-25 15:40",
+      "status": "草稿",
+      "content": "【开头钩子】备婚收纳 30 个神仙好物，第 18 个我后悔没早买！\n\n【婚前准备】证件收纳册 / 喜糖分装盒 / 请柬收纳夹\n【婚礼当天】补妆包 / 针线包 / 创可贴 / 充电宝 / 吸管\n【搬入新家】真空收纳袋 / 旋转调料架 / 床底带轮收纳箱\n\n【结尾引导】清单已整理在评论区，点收藏别找不到了。"
+    }
+  ],
+  "schedules": [
+    {
+      "id": "sd1",
+      "date": "2026-07-30",
+      "type": "拍摄",
+      "title": "婚房收纳好物"
+    },
+    {
+      "id": "sd2",
+      "date": "2026-07-31",
+      "type": "发布",
+      "title": "毛坯房验收 9 要点"
+    },
+    {
+      "id": "sd3",
+      "date": "2026-08-02",
+      "type": "拍摄",
+      "title": "本地婚礼跟拍避坑"
+    }
+  ],
+  "articles": [
+    {
+      "id": "ar1",
+      "title": "装修前必看的 20 个细节",
+      "createdAt": "2026-07-20 10:00",
+      "status": "已发布",
+      "body": "很多人装修完才后悔，其实 80% 的问题都能在开工前避开。\n\n今天整理 20 个最容易踩坑的细节：水电定位要按生活习惯排，而不是按图省事；防水高度至少刷到 1.8 米；瓷砖一定先排版再铺；橱柜高度按做饭人身高减 10cm 最顺手……\n\n建议开工前把这份清单打印贴墙上，每一项验收签字，后期纠纷能少一大半。"
+    },
+    {
+      "id": "ar2",
+      "title": "备婚预算怎么分配最合理",
+      "createdAt": "2026-07-28 21:30",
+      "status": "定时发布",
+      "publishAt": "2026-08-01 08:00",
+      "body": "备婚预算一不留神就超标。我的分配建议：\n\n婚宴酒店 40% / 四大金刚 20% / 婚纱礼服 10% / 物料布置 15% / 杂费备用 15%。\n\n关键是先定总盘再分配，每一项设上限，超了就从备用里挪，别让某一项吃掉全部。把总预算写在共享文档里，双方家属都看得到，省掉很多扯皮。"
+    },
+    {
+      "id": "ar3",
+      "title": "本周验房实录（草稿）",
+      "createdAt": "2026-07-29 19:00",
+      "status": "草稿",
+      "body": "本周陪朋友去验了一套二手房，记录几个真实发现：\n\n· 主卧窗户密闭性差，冬天会漏风\n· 卫生间防水层有起皮\n· 阳台排水坡度过缓，雨天易积水\n\n后续会整理成一篇完整的验房避坑清单，先留个草稿。"
+    }
+  ],
+  "hotspots": [
+    {
+      "id": "h1",
+      "rank": 1,
+      "title": "今年婚礼流行「小而美」户外仪式",
+      "heat": 982130,
+      "track": "备婚"
+    },
+    {
+      "id": "h2",
+      "rank": 2,
+      "title": "老房改造爆火，年轻人爱买二手房",
+      "heat": 874520,
+      "track": "装修"
+    },
+    {
+      "id": "h3",
+      "rank": 3,
+      "title": "本地生活「City Walk 婚礼跟拍」出圈",
+      "heat": 765440,
+      "track": "本地生活"
+    },
+    {
+      "id": "h4",
+      "rank": 4,
+      "title": "婚纱租还是买？算完账我沉默了",
+      "heat": 701220,
+      "track": "备婚"
+    },
+    {
+      "id": "h5",
+      "rank": 5,
+      "title": "小户型收纳神器测评",
+      "heat": 654300,
+      "track": "装修"
+    },
+    {
+      "id": "h6",
+      "rank": 6,
+      "title": "备婚清单 100 项，照着抄",
+      "heat": 598210,
+      "track": "备婚"
+    },
+    {
+      "id": "h7",
+      "rank": 7,
+      "title": "新房除醛到底有没有用",
+      "heat": 543900,
+      "track": "装修"
+    },
+    {
+      "id": "h8",
+      "rank": 8,
+      "title": "婚礼四大金刚怎么选不踩雷",
+      "heat": 498700,
+      "track": "备婚"
+    },
+    {
+      "id": "h9",
+      "rank": 9,
+      "title": "本地宝藏婚宴酒店盘点",
+      "heat": 451200,
+      "track": "本地生活"
+    },
+    {
+      "id": "h10",
+      "rank": 10,
+      "title": "备婚期如何兼顾工作不崩溃",
+      "heat": 412800,
+      "track": "本地生活"
+    }
+  ],
+  "wedding": {
+    "weddingDate": "2026-12-20",
+    "totalBudget": 200000,
+    "groups": {
+      "婚房装修 & 收房验收": [
+        {
+          "id": "w1",
+          "title": "收房验收",
+          "plan": "2026-07-28",
+          "status": "已完成",
+          "note": "已验房，无大问题"
+        },
+        {
+          "id": "w2",
+          "title": "确定装修公司",
+          "plan": "2026-08-15",
+          "status": "进行中",
+          "note": "比价中"
+        },
+        {
+          "id": "w3",
+          "title": "硬装开工",
+          "plan": "2026-09-01",
+          "status": "待办",
+          "note": ""
+        },
+        {
+          "id": "w4",
+          "title": "软装进场",
+          "plan": "2026-11-10",
+          "status": "待办",
+          "note": ""
+        }
+      ],
+      "婚宴酒店预订": [
+        {
+          "id": "w5",
+          "title": "锁定婚宴酒店",
+          "plan": "2026-08-10",
+          "status": "进行中",
+          "note": "看中 2 家"
+        },
+        {
+          "id": "w6",
+          "title": "试菜确认菜单",
+          "plan": "2026-09-20",
+          "status": "待办",
+          "note": ""
+        }
+      ],
+      "婚庆团队对接": [
+        {
+          "id": "w7",
+          "title": "选定婚庆策划",
+          "plan": "2026-08-20",
+          "status": "待办",
+          "note": ""
+        },
+        {
+          "id": "w8",
+          "title": "确认流程脚本",
+          "plan": "2026-11-01",
+          "status": "待办",
+          "note": ""
+        }
+      ],
+      "四大金刚预约": [
+        {
+          "id": "w9",
+          "title": "预约摄影",
+          "plan": "2026-08-25",
+          "status": "待办",
+          "note": ""
+        },
+        {
+          "id": "w10",
+          "title": "预约摄像",
+          "plan": "2026-08-25",
+          "status": "待办",
+          "note": ""
+        },
+        {
+          "id": "w11",
+          "title": "预约化妆",
+          "plan": "2026-09-05",
+          "status": "待办",
+          "note": ""
+        },
+        {
+          "id": "w12",
+          "title": "预约司仪",
+          "plan": "2026-09-05",
+          "status": "待办",
+          "note": ""
+        }
+      ],
+      "婚纱礼服 & 首饰": [
+        {
+          "id": "w13",
+          "title": "挑选主婚纱",
+          "plan": "2026-09-15",
+          "status": "待办",
+          "note": ""
+        },
+        {
+          "id": "w14",
+          "title": "男士西装定制",
+          "plan": "2026-10-01",
+          "status": "待办",
+          "note": ""
+        },
+        {
+          "id": "w15",
+          "title": "婚戒选购",
+          "plan": "2026-10-10",
+          "status": "进行中",
+          "note": "看中对戒"
+        }
+      ],
+      "家纺采购 & 喜糖伴手礼": [
+        {
+          "id": "w16",
+          "title": "四件套采购",
+          "plan": "2026-10-15",
+          "status": "待办",
+          "note": ""
+        },
+        {
+          "id": "w17",
+          "title": "喜糖样品下单",
+          "plan": "2026-08-30",
+          "status": "进行中",
+          "note": "对比 3 家"
+        }
+      ],
+      "婚礼 VI & 物料设计": [
+        {
+          "id": "w18",
+          "title": "请柬设计",
+          "plan": "2026-10-20",
+          "status": "待办",
+          "note": ""
+        },
+        {
+          "id": "w19",
+          "title": "迎宾牌 / 桌卡",
+          "plan": "2026-11-05",
+          "status": "待办",
+          "note": ""
+        }
+      ],
+      "婚前体检 & 备孕准备": [
+        {
+          "id": "w20",
+          "title": "婚前体检预约",
+          "plan": "2026-09-10",
+          "status": "待办",
+          "note": ""
+        },
+        {
+          "id": "w21",
+          "title": "叶酸等营养补充",
+          "plan": "2026-08-01",
+          "status": "进行中",
+          "note": "已购"
+        }
+      ]
+    },
+    "budgetLedger": [
+      {
+        "id": "b1",
+        "time": "2026-07-12",
+        "cat": "其他杂费",
+        "amount": 2800,
+        "note": "婚庆咨询定金",
+        "wedding": true
+      },
+      {
+        "id": "b2",
+        "time": "2026-07-20",
+        "cat": "服饰首饰支出",
+        "amount": 6800,
+        "note": "对戒定金",
+        "wedding": true
+      },
+      {
+        "id": "b3",
+        "time": "2026-07-26",
+        "cat": "物料采购支出",
+        "amount": 1200,
+        "note": "喜糖样品",
+        "wedding": true
+      }
+    ],
+    "files": [
+      {
+        "id": "f1",
+        "name": "婚宴酒店报价单-A.docx",
+        "time": "2026-07-18",
+        "type": "doc"
+      },
+      {
+        "id": "f2",
+        "name": "装修合同-初稿.pdf",
+        "time": "2026-07-22",
+        "type": "pdf"
+      },
+      {
+        "id": "f3",
+        "name": "婚庆策划方案.pdf",
+        "time": "2026-07-26",
+        "type": "pdf"
+      }
+    ]
+  },
+  "savings": [
+    {
+      "id": "s1",
+      "name": "婚礼备用金",
+      "target": 50000,
+      "deadline": "2026-11-30",
+      "note": "应对临时支出",
+      "records": [
+        {
+          "id": "r1",
+          "time": "2026-07-05",
+          "amount": 3000,
+          "note": "工资"
+        },
+        {
+          "id": "r2",
+          "time": "2026-07-20",
+          "amount": 2500,
+          "note": "兼职"
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "name": "蜜月旅行",
+      "target": 30000,
+      "deadline": "2026-12-10",
+      "note": "境外游",
+      "records": [
+        {
+          "id": "r3",
+          "time": "2026-07-10",
+          "amount": 2000,
+          "note": "工资"
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "name": "新房家电",
+      "target": 20000,
+      "deadline": "2026-10-01",
+      "note": "空调+冰箱",
+      "records": [
+        {
+          "id": "r4",
+          "time": "2026-07-15",
+          "amount": 1500,
+          "note": "结余"
+        }
+      ]
+    }
+  ],
+  "transactions": [
+    {
+      "id": "x1",
+      "type": "income",
+      "cat": "工资",
+      "amount": 12000,
+      "time": "2026-07-05",
+      "note": "月度工资",
+      "toSaving": "s1",
+      "toWedding": false
+    },
+    {
+      "id": "x2",
+      "type": "income",
+      "cat": "兼职",
+      "amount": 2500,
+      "time": "2026-07-20",
+      "note": "设计外包",
+      "toSaving": "s1",
+      "toWedding": false
+    },
+    {
+      "id": "x3",
+      "type": "expense",
+      "cat": "其他杂费",
+      "amount": 2800,
+      "time": "2026-07-12",
+      "note": "婚庆咨询定金",
+      "toSaving": null,
+      "toWedding": true
+    },
+    {
+      "id": "x4",
+      "type": "expense",
+      "cat": "服饰首饰支出",
+      "amount": 6800,
+      "time": "2026-07-20",
+      "note": "对戒定金",
+      "toSaving": null,
+      "toWedding": true
+    },
+    {
+      "id": "x5",
+      "type": "expense",
+      "cat": "物料采购支出",
+      "amount": 1200,
+      "time": "2026-07-26",
+      "note": "喜糖样品",
+      "toSaving": null,
+      "toWedding": true
+    },
+    {
+      "id": "x6",
+      "type": "expense",
+      "cat": "餐饮",
+      "amount": 860,
+      "time": "2026-07-08",
+      "note": "聚餐",
+      "toSaving": null,
+      "toWedding": false
+    },
+    {
+      "id": "x7",
+      "type": "expense",
+      "cat": "购物",
+      "amount": 540,
+      "time": "2026-07-15",
+      "note": "日用品",
+      "toSaving": null,
+      "toWedding": false
+    },
+    {
+      "id": "x8",
+      "type": "expense",
+      "cat": "交通",
+      "amount": 320,
+      "time": "2026-07-22",
+      "note": "打车",
+      "toSaving": null,
+      "toWedding": false
+    },
+    {
+      "id": "x9",
+      "type": "income",
+      "cat": "工资",
+      "amount": 12000,
+      "time": "2026-06-05",
+      "note": "6月工资",
+      "toSaving": null,
+      "toWedding": false
+    },
+    {
+      "id": "x10",
+      "type": "expense",
+      "cat": "餐饮",
+      "amount": 2100,
+      "time": "2026-06-12",
+      "note": "6月餐饮",
+      "toSaving": null,
+      "toWedding": false
+    }
+  ],
+  "diet": {
+    "today": {
+      "date": "2026-07-30",
+      "meals": {
+        "早餐": {
+          "done": true,
+          "kcal": 380,
+          "photo": "🥪"
+        },
+        "午餐": {
+          "done": true,
+          "kcal": 620,
+          "photo": "🍱"
+        },
+        "晚餐": {
+          "done": false,
+          "kcal": 0,
+          "photo": null
+        }
+      },
+      "target": 1800
+    },
+    "monthRate": 0.82,
+    "history": [
+      {
+        "date": "2026-07-29",
+        "kcal": 1720,
+        "rate": 1
+      },
+      {
+        "date": "2026-07-28",
+        "kcal": 1980,
+        "rate": 0.9
+      },
+      {
+        "date": "2026-07-27",
+        "kcal": 1650,
+        "rate": 1
+      }
+    ]
+  },
+  "moods": [
+    {
+      "id": "m1",
+      "date": "2026-07-29",
+      "mood": "平静",
+      "weather": "☀️ 晴",
+      "text": "验收顺利，装修公司也聊得不错。"
+    },
+    {
+      "id": "m2",
+      "date": "2026-07-28",
+      "mood": "焦虑",
+      "weather": "🌧️ 雨",
+      "text": "预算有点超，得再规划一下。"
+    }
+  ],
+  "reviews": [
+    {
+      "id": "rv1",
+      "week": "2026-07-21 ~ 2026-07-27",
+      "done": [
+        "完成收房验收",
+        "发布 1 篇公众号",
+        "存钱目标 +5500"
+      ],
+      "undone": [
+        "婚宴酒店未定",
+        "脚本仅 1 篇"
+      ],
+      "problem": "时间分散，备婚推进慢",
+      "plan": [
+        "本周锁定酒店",
+        "每日 1 条脚本",
+        "预算重算"
+      ],
+      "goal": [
+        "酒店定金",
+        "脚本 x3"
+      ]
+    },
+    {
+      "id": "rv2",
+      "week": "2026-07-14 ~ 2026-07-20",
+      "done": [
+        "确定对戒",
+        "记账体系搭好"
+      ],
+      "undone": [
+        "软装方案"
+      ],
+      "problem": "兼职占用周末",
+      "plan": [
+        "排期前置"
+      ],
+      "goal": [
+        "对戒定金"
+      ]
+    }
+  ],
+  "svreviews": [
+    {
+      "id": "sv1",
+      "platform": "抖音",
+      "title": "毛坯房验收 9 个必查点",
+      "link": "https://v.douyin.com/example1",
+      "publishDate": "2026-07-22",
+      "play": 125000,
+      "like": 8600,
+      "comment": 540,
+      "fav": 3200,
+      "share": 1100,
+      "finish": 42,
+      "tag": "验房",
+      "note": "开头用「花几十万买房」制造焦虑钩子，完播拉满；结尾引导关注下期。"
+    },
+    {
+      "id": "sv2",
+      "platform": "小红书",
+      "title": "备婚收纳 30 个好物",
+      "link": "https://www.xiaohongshu.com/example2",
+      "publishDate": "2026-07-25",
+      "play": 38000,
+      "like": 2100,
+      "comment": 80,
+      "fav": 1500,
+      "share": 120,
+      "finish": 18,
+      "tag": "备婚",
+      "note": "收藏还行但完播掉得厉害，中段铺垫太长。"
+    },
+    {
+      "id": "sv3",
+      "platform": "视频号",
+      "title": "本地婚礼跟拍避坑",
+      "link": "https://weixin.qq.com/example3",
+      "publishDate": "2026-07-28",
+      "play": 9600,
+      "like": 720,
+      "comment": 210,
+      "fav": 300,
+      "share": 95,
+      "finish": 35,
+      "tag": "本地生活",
+      "note": "评论率异常高，话题性强，适合做系列。"
+    }
+  ],
+  "materials": [
+    {
+      "id": "mt1",
+      "name": "婚庆封面模板-01",
+      "cat": "封面模板",
+      "type": "psd",
+      "time": "2026-07-10"
+    },
+    {
+      "id": "mt2",
+      "name": "片头动画-婚礼",
+      "cat": "片头片尾",
+      "type": "mp4",
+      "time": "2026-07-12"
+    },
+    {
+      "id": "mt3",
+      "name": "验房实拍-客厅",
+      "cat": "实拍素材",
+      "type": "jpg",
+      "time": "2026-07-20"
+    },
+    {
+      "id": "mt4",
+      "name": "IP形象-喜鹊",
+      "cat": "IP 素材",
+      "type": "ai",
+      "time": "2026-07-15"
+    },
+    {
+      "id": "mt5",
+      "name": "备婚海报源文件",
+      "cat": "海报源文件",
+      "type": "psd",
+      "time": "2026-07-22"
+    },
+    {
+      "id": "mt6",
+      "name": "装修前后对比",
+      "cat": "装修素材",
+      "type": "jpg",
+      "time": "2026-07-25"
+    },
+    {
+      "id": "mt7",
+      "name": "婚礼请柬模板",
+      "cat": "备婚素材",
+      "type": "ai",
+      "time": "2026-07-26"
+    }
+  ],
+  "materialCats": [
+    "封面模板",
+    "片头片尾",
+    "实拍素材",
+    "IP 素材",
+    "海报源文件",
+    "备婚素材",
+    "装修素材"
+  ]
+}
