@@ -775,7 +775,7 @@ a{color:inherit;text-decoration:none;}
   App.todayStr = todayStr;
   App.TODAY = todayStr();
   App.refreshToday = function(){ App.TODAY = todayStr(); App.todayNum = ts(App.TODAY); return App.TODAY; };
-  App.BUILD = "2026-08-02.13";
+  App.BUILD = "2026-08-02.14";
 
   const clone = (o)=>JSON.parse(JSON.stringify(o));
 
@@ -1202,6 +1202,27 @@ a{color:inherit;text-decoration:none;}
     },
     deleteTask(id){ store.state.todayTasks=store.state.todayTasks.filter(x=>x.id!==id); save(); },
     clearDoneTasks(){ store.state.todayTasks=store.state.todayTasks.filter(x=>x.status!=="已完成"); save(); },
+    // 智能分配：从其他模块汇总未完成任务，合理生成今日待办（去重，避免重复点击重复添加）
+    autoPlanToday(){
+      const st=store.state, today=App.TODAY;
+      const have=new Set((st.todayTasks||[]).map(t=>t.title));
+      let n=0;
+      const add=(title,cat,due,note)=>{ if(have.has(title))return; have.add(title); M.addTask({title,cat,due,status:"待办",note:note||"",remind:true}); n++; };
+      // 1) 备婚：未来两周内 / 已逾期的未完成任务
+      for(const g of App.WEDDING_GROUPS){ (st.wedding.groups[g]||[]).forEach(t=>{
+        if(t.status==="已完成")return; const df=App.daysLeft(t.plan); if(df>14)return;
+        add("【备婚】"+t.title,"备婚", t.plan+" 18:00", g);
+      }); }
+      // 2) 创作助手：未拍 / 已拍未出片的选题
+      (st.topics||[]).forEach(t=>{ if(t.status==="未拍摄"||t.status==="已拍摄") add("脚本+拍摄："+t.title,"自媒体", today+" 18:00", t.platform+" / "+t.track); });
+      // 3) 公众号：草稿 / 定时发布
+      (st.articles||[]).forEach(a=>{ if(a.status==="草稿"||a.status==="定时发布") add("排版发布："+a.title,"自媒体", today+" 18:00", "公众号"); });
+      // 4) 短视频复盘：缺笔记的视频
+      (st.svreviews||[]).forEach(v=>{ if(!v.note||!v.note.trim()) add("复盘视频："+v.title,"自媒体", today+" 18:00", v.platform); });
+      // 5) 存钱：临近截止且未达成
+      (st.savings||[]).forEach(g=>{ const s=App.calc.savingStatus(g); if(s.status!=="已达成" && App.daysLeft(g.deadline)>=0 && App.daysLeft(g.deadline)<=14) add("存钱打卡："+g.name,"生活", today+" 20:00", "目标 ¥"+g.target+" · 剩 "+App.daysLeft(g.deadline)+" 天"); });
+      return n;
+    },
     quickAddTomorrow(title){
       const tmr=new Date(); tmr.setDate(tmr.getDate()+1); const p=n=>String(n).padStart(2,"0");
       const due=`${tmr.getFullYear()}-${p(tmr.getMonth()+1)}-${p(tmr.getDate())} 09:00`;
@@ -1355,9 +1376,41 @@ a{color:inherit;text-decoration:none;}
     deleteMood(id){ store.state.moods=store.state.moods.filter(x=>x.id!==id); save(); },
 
     // ---- 每周复盘 ----
-    addReview(v){ store.state.reviews.unshift({id:store.uid("rv"),week:v.week,done:[],undone:[],problem:"",plan:[],goal:[]}); save(); },
+    addReview(v){ store.state.reviews.unshift({id:store.uid("rv"),week:v.week,done:v.done||[],undone:v.undone||[],problem:v.problem||"",plan:v.plan||[],goal:v.goal||[]}); save(); },
     updateReview(id,v){ const r=store.state.reviews.find(x=>x.id===id); if(r)Object.assign(r,v); save(); },
     deleteReview(id){ store.state.reviews=store.state.reviews.filter(x=>x.id!==id); save(); },
+    // 自动生成本周复盘：汇总本周各模块完成情况，返回可编辑的复盘草稿
+    autoReview(){
+      const st=store.state, TH=App.TODAY;
+      const d=new Date(+TH.slice(0,4),+TH.slice(5,7)-1,+TH.slice(8,10));
+      const dow=d.getDay(); const mon=new Date(d); mon.setDate(d.getDate()-((dow+6)%7));
+      const sun=new Date(mon); sun.setDate(mon.getDate()+6);
+      const p=n=>String(n).padStart(2,"0"); const fmt=x=>`${x.getFullYear()}-${p(x.getMonth()+1)}-${p(x.getDate())}`;
+      const start=fmt(mon), end=fmt(sun);
+      const inWeek=s=>{ const v=ts(s); return v>=ts(start)&&v<=ts(end); };
+      const done=[], undone=[];
+      (st.todayTasks||[]).forEach(t=>{
+        if(t.status==="已完成"&&t.doneAt&&inWeek(t.doneAt)) done.push("✅ "+t.title);
+        else if(t.status!=="已完成"){ if(t.due&&ts(t.due)<ts(TH)) undone.push("⏰ 逾期："+t.title); else if(!t.due||inWeek(t.due)) undone.push("待办："+t.title); }
+      });
+      for(const g of App.WEDDING_GROUPS){ (st.wedding.groups[g]||[]).forEach(t=>{
+        if(t.status==="已完成") done.push("【备婚】完成："+t.title);
+        else { const df=App.daysLeft(t.plan); if(df<=0) undone.push("【备婚】逾期："+t.title); else if(df<=7) undone.push("【备婚】待办："+t.title); }
+      }); }
+      (st.svreviews||[]).forEach(v=>{ if(inWeek(v.publishDate)) done.push("发布短视频："+v.title+"（"+v.platform+"）"); });
+      (st.articles||[]).forEach(a=>{ if(a.status==="已发布") done.push("发布公众号："+a.title); else if(a.status==="草稿") undone.push("公众号待发布："+a.title); });
+      (st.topics||[]).forEach(t=>{ if(t.status!=="已发布") undone.push("选题推进："+t.title); });
+      (st.savings||[]).forEach(g=>{ const s=App.calc.savingStatus(g); if(s.status!=="已达成") undone.push("存钱："+g.name+"（剩 "+App.daysLeft(g.deadline)+" 天）"); else done.push("存钱达标："+g.name); });
+      const overdue=undone.filter(x=>x.indexOf("逾期")>=0).length;
+      const problem = overdue>0 ? `本周有 ${overdue} 项逾期，节奏需加快；建议每天固定时段处理备婚与内容，避免堆积。`
+                                 : "本周整体推进顺利，保持每日稳定产出即可。";
+      const plan=[], goal=[];
+      for(const g of App.WEDDING_GROUPS){ (st.wedding.groups[g]||[]).forEach(t=>{ const df=App.daysLeft(t.plan); if(t.status!=="已完成"&&df>0&&df<=14) plan.push("推进："+t.title+"（"+t.plan+"）"); }); }
+      (st.savings||[]).forEach(g=>{ if(App.calc.savingStatus(g).status!=="已达成") plan.push("存钱打卡："+g.name); });
+      (st.topics||[]).forEach(t=>{ if(t.status!=="已发布") plan.push("完成脚本："+t.title); });
+      for(const g of App.WEDDING_GROUPS){ (st.wedding.groups[g]||[]).forEach(t=>{ const df=App.daysLeft(t.plan); if(t.status!=="已完成"&&df>0&&df<=7) goal.push(t.title); }); }
+      return { week:start+" ~ "+end, done:done.slice(0,12), undone:undone.slice(0,12), problem, plan:plan.slice(0,8), goal:goal.slice(0,5) };
+    },
 
     // ---- 短视频复盘 ----
     addSvReview(v){
@@ -1641,7 +1694,8 @@ a{color:inherit;text-decoration:none;}
           <div class="card-body" style="padding-top:4px"><div class="list">${rows||empty("还没有任务，点击下方新增")}</div></div></div>
       </div>
       <div class="head-actions" style="margin-top:18px">
-        ${ui().btn("＋ 新增任务","primary","add-task")}
+        ${ui().btn("🤖 智能分配","primary","auto-plan")}
+        ${ui().btn("＋ 新增任务","ghost","add-task")}
         ${ui().btn("🧹 一键清空已完成","ghost","clear-done")}
         ${ui().btn("📝 明日计划快速录入","ghost","quick-tomorrow")}
       </div>`;
@@ -1652,6 +1706,7 @@ a{color:inherit;text-decoration:none;}
       "complete-task":e=>{ M().completeTask(e.currentTarget.dataset.id); App.refresh(); ui().toast("状态已更新"); },
       "del-task":e=>{ const id=e.currentTarget.dataset.id; ui().confirm({text:"确定删除该任务？",onOk:()=>{ M().deleteTask(id); App.refresh(); ui().toast("已删除"); }}); },
       "clear-done":()=>{ M().clearDoneTasks(); App.refresh(); ui().toast("已清空已完成"); },
+      "auto-plan":()=>{ const n=M().autoPlanToday(); App.refresh(); ui().toast(n? `已从各模块生成 ${n} 条今日任务`:"暂无新任务可分配（都已安排过啦）"); },
       "quick-tomorrow":()=>ui().formModal({title:"明日计划快速录入",okText:"批量添加",fields:[
         {name:"text",label:"待办内容（每行一条）",type:"textarea",required:true,placeholder:"09:00 晨跑\n14:00 客户会议"}],
         onSubmit:v=>{ const lines=v.text.split("\n").map(x=>x.trim()).filter(Boolean); lines.forEach(l=>M().quickAddTomorrow(l)); App.refresh(); ui().toast(`已添加 ${lines.length} 条明日计划`); }}),
@@ -2169,7 +2224,7 @@ a{color:inherit;text-decoration:none;}
         <div class="card-body">${li(r.done,"本周完成")}${li(r.undone,"本周未完成")}${li([r.problem],"问题总结")}${li(r.plan,"下周改进")}${li(r.goal,"下周目标")}</div></div>`; }).join("");
     el.innerHTML=`
       <div class="page-head"><div><h2>🔁 每周复盘</h2><p>固定模板 · 持续迭代</p></div>
-        <div class="head-actions">${ui().btn("＋ 新增周复盘","primary","rv-add")}</div></div>
+        <div class="head-actions">${ui().btn("🤖 自动生成本周复盘","primary","rv-auto")} ${ui().btn("＋ 新增周复盘","ghost","rv-add")}</div></div>
       <div class="card" style="margin-bottom:16px"><div class="card-head"><h3>复盘模板</h3></div><div class="card-body" style="color:var(--text-2);line-height:1.9">
         ① 本周完成事项 &nbsp; ② 本周未完成事项 &nbsp; ③ 本周问题总结 &nbsp; ④ 下周改进计划 &nbsp; ⑤ 下周目标</div></div>
       ${cards||empty("还没有复盘记录")}`;
@@ -2188,6 +2243,16 @@ a{color:inherit;text-decoration:none;}
           onSubmit:v=>{ const sp=x=>x.split("\n").map(z=>z.trim()).filter(Boolean);
             M().updateReview(r.id,{done:sp(v.done),undone:sp(v.undone),problem:v.problem,plan:sp(v.plan),goal:sp(v.goal)}); App.refresh(); ui().toast("已保存"); }}); },
       "rv-del":e=>{ const id=e.currentTarget.dataset.id; const r=s.reviews.find(x=>x.id===id); ui().confirm({text:"删除该周复盘"+(r?"「"+r.week+"」":"")+"？此操作不可撤销",onOk:()=>{ M().deleteReview(id); App.refresh(); ui().toast("已删除"); }}); },
+      "rv-auto":()=>{ const r=M().autoReview(); const join=a=>(a||[]).join("\n");
+        ui().formModal({title:"自动生成 · 本周复盘（可修改后再存）",size:"lg",fields:[
+          {name:"week",label:"周区间",type:"text",value:r.week},
+          {name:"done",label:"本周完成（每行一条）",type:"textarea",value:join(r.done)},
+          {name:"undone",label:"本周未完成",type:"textarea",value:join(r.undone)},
+          {name:"problem",label:"问题总结",type:"textarea",value:r.problem||""},
+          {name:"plan",label:"下周改进计划",type:"textarea",value:join(r.plan)},
+          {name:"goal",label:"下周目标",type:"textarea",value:join(r.goal)}],
+          onSubmit:v=>{ const sp=x=>x.split("\n").map(z=>z.trim()).filter(Boolean);
+            M().addReview({week:v.week,done:sp(v.done),undone:sp(v.undone),problem:v.problem,plan:sp(v.plan),goal:sp(v.goal)}); App.refresh(); ui().toast("本周复盘已生成并保存"); }}); },
     });
   }
 
