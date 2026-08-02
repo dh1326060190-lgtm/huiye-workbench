@@ -771,7 +771,7 @@ a{color:inherit;text-decoration:none;}
   const App = (window.App = window.App || {});
   const KEY = "designer_os_state_v1";
   App.TODAY = "2026-07-31";
-  App.BUILD = "2026-07-31.10";
+  App.BUILD = "2026-08-02.11";
 
   const clone = (o)=>JSON.parse(JSON.stringify(o));
 
@@ -795,16 +795,18 @@ a{color:inherit;text-decoration:none;}
       if(App.ui && App.ui.toast) App.ui.toast("⚠️ 本地存储已满，本次修改可能未保存。请到「系统设置 → 数据」导出备份并删减素材图片",4200);
       else console.warn("save failed", e);
     }
-    if(App.cloudSync && !App.cloudSync.suppress()) App.cloudSync.schedulePush();
+    // 不再自动推送：编辑只存本地，由用户点「推送到 GitHub」手动同步，避免并发 409。
+    if(App.cloudSync && App.cloudSync.enabled()) App.cloudSync.markDirty();
   }
   App.STORAGE_KEY = KEY;
   App.dataUsage = function(){ try{ const v=localStorage.getItem(KEY)||""; const kb=new Blob([v]).size/1024; return (kb>1024?(kb/1024).toFixed(2)+" MB":Math.round(kb)+" KB")+" / 5 MB"; }catch(e){ return "未知"; } };
 
-  // ---------- 云端自动同步（GitHub 仓库 API） ----------
-  // 每次数据保存时同步推送到 GitHub 仓库；页面打开时自动拉取最新数据。
+  // ---------- 云端同步（GitHub 仓库 API） ----------
+  // 手动模式：编辑只存本地，点「推送到 GitHub」才上传，避免连续改动触发并发推送造成 409。
+  // 打开页面自动拉取最新数据；上传用乐观并发（每次重试重新取 sha），不再删除重建。
   // 使用 GitHub Contents API，数据以 JSON 文件形式存储在指定仓库中。
   App.cloudSync = (function(){
-    let suppressFlag=false, lastContentHash=null, pushing=false, pushTimer=null, lastSha=null;
+    let suppressFlag=false, lastContentHash=null, pushing=false, lastSha=null, dirty=false;
 
     function cfg(){
       const s=store.state.settings;
@@ -818,6 +820,20 @@ a{color:inherit;text-decoration:none;}
     }
     function enabled(){ return cfg().on && cfg().token && cfg().repo; }
     function suppress(){ return suppressFlag; }
+    function isDirty(){ return dirty; }
+    function markDirty(){ dirty=true; updateBadge(); }
+    function clearDirty(){ dirty=false; updateBadge(); }
+    function updateBadge(){
+      const b=document.getElementById("syncBadge");
+      if(b) b.style.display = dirty ? "inline-flex" : "none";
+    }
+    // 本地数据与云端是否不一致：用于刷新/启动后恢复「待同步」状态
+    function compareDirty(){
+      try{
+        const content = JSON.stringify(store.state, (k,v)=> (k==="githubToken")?undefined:v, 2);
+        if(hash(content) !== lastContentHash) markDirty(); else clearDirty();
+      }catch(e){}
+    }
 
     function headers(c){
       const h = {"Accept":"application/vnd.github.v3+json"};
@@ -833,19 +849,20 @@ a{color:inherit;text-decoration:none;}
     function b64decode(b64){ return decodeURIComponent(escape(atob(b64))); }
     function hash(str){ return btoa(unescape(encodeURIComponent(str))).slice(0,20); }
 
-    // 推送数据到 GitHub 仓库
+    // 推送数据到 GitHub 仓库（乐观并发：每次重试重新取最新 sha，避免 409/422）
     async function pushOnce(){
       const c = cfg();
       if(!c.token || !c.repo){
         if(App.ui&&App.ui.toast) App.ui.toast("请先在设置中填写 GitHub Token 和仓库名","warn");
         return;
       }
-      if(pushing) return;
+      if(pushing){ if(App.ui&&App.ui.toast) App.ui.toast("正在同步中，请稍候…","warn"); return; }
       pushing=true;
       try{
         const content = JSON.stringify(store.state, (k,v)=> (k==="githubToken")?undefined:v, 2);
         const b64content = b64encode(content);
         const msg = "workbench sync " + new Date().toISOString().slice(0,19).replace("T"," ");
+        const sleep = ms => new Promise(r=>setTimeout(r,ms));
         async function getSha(){
           try{
             const r = await fetch(apiUrl(c,true), {headers: headers(c)});
@@ -853,51 +870,36 @@ a{color:inherit;text-decoration:none;}
           }catch(e){}
           return null;
         }
-        async function doPush(sha){
+        let res=null;
+        // 最多重试 6 次；每次冲突前重新取 sha，确保用最新版本更新
+        for(let i=0; i<6; i++){
+          const sha = await getSha();
           const body = {message:msg, content:b64content, branch:c.branch};
-          if(sha) body.sha = sha;
-          const res = await fetch(apiUrl(c,false), {
+          if(sha) body.sha = sha;              // 已有文件 → 更新；无 sha → 新建
+          res = await fetch(apiUrl(c,false), {
             method: "PUT",
             headers: Object.assign(headers(c), {"Content-Type":"application/json"}),
             body: JSON.stringify(body)
           });
-          return res;
-        }
-        // 策略：先删旧文件再建新文件，彻底绕开 sha 冲突
-        // 加随机抖动避免多设备同时操作死锁，最多重试8次
-        async function doDelete(sha){
-          if(!sha) return true; // 文件不存在，无需删
-          const res = await fetch(apiUrl(c,false), {
-            method: "DELETE",
-            headers: Object.assign(headers(c), {"Content-Type":"application/json"}),
-            body: JSON.stringify({message:"sync: replace", sha:sha, branch:c.branch})
-          });
-          return res.ok || res.status===404;
-        }
-        let res=null;
-        for(let i=0; i<8; i++){
-          const sha = await getSha();        // 获取当前 sha
-          await doDelete(sha);               // 删除旧文件
-          // 删除后重新创建（不带 sha）
-          res = await fetch(apiUrl(c,false), {
-            method: "PUT",
-            headers: Object.assign(headers(c), {"Content-Type":"application/json"}),
-            body: JSON.stringify({message:msg, content:b64content, branch:c.branch})
-          });
-          if(res.ok){ lastContentHash = hash(content); if(App.ui&&App.ui.toast) App.ui.toast("☁ 已同步到 GitHub"); pushing=false; return; }
-          // 如果删除失败导致文件仍在（422），用 sha 更新再试
-          if(res.status===422 && sha){
-            res = await doPush(sha);
-            if(res.ok){ lastContentHash = hash(content); if(App.ui&&App.ui.toast) App.ui.toast("☁ 已同步到 GitHub"); pushing=false; return; }
+          if(res.ok){
+            const j = await res.json().catch(()=>({}));
+            lastContentHash = hash(content);
+            lastSha = (j.content && j.content.sha) || null;
+            clearDirty();
+            if(App.ui&&App.ui.toast) App.ui.toast("☁ 已同步到 GitHub");
+            return;
           }
-          const jitter = 200*i + Math.floor(Math.random()*300);
-          await new Promise(r=>setTimeout(r, jitter));
+          if(res.status===409 || res.status===422){
+            // 并发冲突：稍等后重新取 sha 再试
+            await sleep(300*i + Math.floor(Math.random()*400));
+            continue;
+          }
+          const errBody = await res.json().catch(()=>({}));
+          throw new Error("HTTP " + res.status + (errBody.message?": "+errBody.message:""));
         }
-
-        const errBody = await res.json().catch(()=>({}));
-        throw new Error("HTTP " + res.status + (errBody.message?": "+errBody.message:""));
+        throw new Error("多次重试仍冲突，请先「从 GitHub 拉取」再推送");
       }catch(err){
-        let msg = err.message;
+        let msg = err.message || String(err);
         if(msg.includes("401")){
           msg = "Token 认证失败。请检查：① Token 是否复制完整 ② 是否勾选了 repo 权限 ③ Token 是否过期";
         }else if(msg.includes("404")){
@@ -905,16 +907,12 @@ a{color:inherit;text-decoration:none;}
         }else if(msg.includes("403")){
           msg = "没有写入权限。请确认 Token 有 repo 权限，且对该仓库有写权限";
         }else if(msg.includes("409") || msg.includes("422")){
-          msg = "多设备同时推送冲突。请确保同一时间只在一台设备上改动，稍后重试";
+          msg = "冲突：请先点「从 GitHub 拉取」，再点「推送到 GitHub」";
         }
         if(App.ui&&App.ui.toast) App.ui.toast("GitHub 同步失败："+msg,"warn",4200);
+      }finally{
+        pushing=false;
       }
-      pushing=false;
-    }
-    function schedulePush(){
-      if(!enabled() || suppress()) return;
-      if(pushTimer) clearTimeout(pushTimer);
-      pushTimer = setTimeout(()=>{ pushTimer=null; pushOnce(); }, 800);
     }
     // 从 GitHub 拉取数据
     async function pull(){
@@ -942,6 +940,7 @@ a{color:inherit;text-decoration:none;}
         lastContentHash = newHash;
         lastSha = data.sha || null;
         setTimeout(()=>{ suppressFlag=false; }, 2000);
+        compareDirty(); // 拉取后本地应与云端一致 → 清除「待同步」
         if(App.ui&&App.ui.toast) App.ui.toast("☁ 已从 GitHub 拉取最新数据");
         return true;
       }catch(e){
@@ -970,9 +969,10 @@ a{color:inherit;text-decoration:none;}
         lastContentHash = newHash;
         lastSha = data.sha || null;
         setTimeout(()=>{ suppressFlag=false; }, 2000);
+        compareDirty();
       }catch(e){}
     }
-    return {enabled, suppress, schedulePush, pull, pushOnce, backgroundPull, cfg};
+    return {enabled, suppress, markDirty, isDirty, clearDirty, compareDirty, pull, pushOnce, backgroundPull, cfg};
   })();
 
   const store = {
@@ -2249,7 +2249,7 @@ a{color:inherit;text-decoration:none;}
           <div class="k">数据模式<b style="color:${App._noPersist?'var(--danger)':'var(--green-700)'}">${App._noPersist?'临时模式（未保存）':'已本地保存'}</b></div>
           <div class="k">存储占用<b>${App.dataUsage()}</b></div>
         </div>
-        <p class="muted" style="font-size:12.5px;line-height:1.7;margin:0 0 12px"><b>跨设备同步推荐用法：</b>在下方「GitHub 云同步」填写 Token 和仓库名，开启自动同步开关。之后<b>每台设备</b>打开页面自动拉取最新数据，修改后自动推送到 GitHub，所有设备共享同一份数据。<br>也可手动导出/导入 JSON 做离线备份。若显示「临时模式」，多为手机以 file:// 打开导致本地存储受限，建议部署到 HTTPS 域名访问。</p>
+        <p class="muted" style="font-size:12.5px;line-height:1.7;margin:0 0 12px"><b>跨设备同步推荐用法：</b>在下方「GitHub 云同步」填写 Token 和仓库名，开启开关。之后<b>每台设备</b>打开页面会自动从 GitHub 拉取最新数据；你在本机修改后，点「立即推送到 GitHub」即可上传，所有设备共享同一份数据。<br><b>注意：</b>为彻底避免「连续删除多条记录就报错 409」，改动的保存是纯本地的，只有你点「推送到 GitHub」时才上传——可以放心连续改很多条，最后统一推一次。也可手动导出/导入 JSON 做离线备份。若显示「临时模式」，多为手机以 file:// 打开导致本地存储受限，建议部署到 HTTPS 域名访问。</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
           ${ui().btn("⬇ 导出数据","primary","set-export")}
           ${ui().btn("⬆ 导入数据（换设备恢复）","primary","set-import")}
@@ -2260,7 +2260,7 @@ a{color:inherit;text-decoration:none;}
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
             <b>☁ GitHub 云同步</b>
           </div>
-          <p class="muted" style="font-size:12.5px;line-height:1.7;margin:0 0 10px">数据自动保存到 GitHub 仓库，<b>所有设备共享同一份数据</b>。需先在 GitHub 创建仓库并生成 Token（需 repo 权限），然后填写下方配置。</p>
+          <p class="muted" style="font-size:12.5px;line-height:1.7;margin:0 0 10px">数据可同步到 GitHub 仓库，<b>所有设备共享同一份数据</b>。编辑只存本地，点「立即推送到 GitHub」才上传，避免连续改动触发并发报错。需先在 GitHub 创建仓库并生成 Token（需 repo 权限），然后填写下方配置。</p>
           <div class="form" style="margin-bottom:10px">
             <div class="grp"><label>GitHub Token</label><input id="ghToken" type="password" value="${App.esc(st.githubToken)}" placeholder="ghp_xxxxxxxx"></div>
             <div class="grp"><label>仓库名（owner/repo）</label><input id="ghRepo" value="${App.esc(st.ghRepo)}" placeholder="如 DH1326060190-LGTM/DJPT"></div>
@@ -2269,7 +2269,7 @@ a{color:inherit;text-decoration:none;}
             <button class="btn btn-primary" data-action="gh-save">保存 GitHub 配置</button>
           </div>
           ${toggle("☁ 开启自动云同步","cloudSync",!!st.cloudSync)}
-          ${st.cloudSync?'<p class="muted" style="font-size:12px;margin:6px 0 8px">开启后：本设备每次改动自动推送到 GitHub；打开页面时自动拉取最新数据。Token 仅保存在本设备，不会被同步到云端。</p>':''}
+          ${st.cloudSync?'<p class="muted" style="font-size:12px;margin:6px 0 8px">开启后：打开页面会自动从 GitHub 拉取最新数据；本机修改后请点「立即推送到 GitHub」手动上传。Token 仅保存在本设备，不会被同步到云端。</p>':''}
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
             ${st.cloudSync?ui().btn("⬇ 立即从 GitHub 拉取","ghost","cloud-pull"):''}
             ${st.cloudSync?ui().btn("☁ 立即推送到 GitHub","ghost","cloud-push"):''}
@@ -2487,10 +2487,24 @@ a{color:inherit;text-decoration:none;}
       if(App._noPersist && App.ui && App.ui.toast){
         App.ui.toast("临时模式：本环境无法保存数据，请到「系统设置 → 数据导出」备份", 4200);
       }
-      // 启动时自动从 GitHub 拉取最新数据
+      // 启动时自动从 GitHub 拉取最新数据，并恢复「待同步」角标状态
       if(App.cloudSync){
-        setTimeout(()=>{
-          if(App.cloudSync.enabled()) App.cloudSync.pull();
+        // 创建「待同步」角标（点击即可推送）
+        (function(){
+          let b=document.createElement('div');
+          b.id='syncBadge';
+          b.textContent='● 待同步';
+          b.style.cssText='position:fixed;top:10px;right:12px;z-index:99998;background:#b45309;color:#fff;font-size:12px;font-weight:600;padding:5px 10px;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.25);display:none;cursor:pointer;letter-spacing:.5px';
+          b.title='本地有改动尚未推送到 GitHub，点击同步';
+          b.onclick=function(){ if(App.cloudSync) App.cloudSync.pushOnce(); };
+          document.body.appendChild(b);
+          App.cloudSync.updateBadge && App.cloudSync.updateBadge();
+        })();
+        setTimeout(async ()=>{
+          if(App.cloudSync.enabled()){
+            await App.cloudSync.pull();
+            App.cloudSync.compareDirty(); // 若本地与云端不一致，显示「待同步」
+          }
         }, 800);
         // 每 30 秒自动检查 GitHub 是否有新数据
         setInterval(()=>{
@@ -2509,13 +2523,13 @@ a{color:inherit;text-decoration:none;}
   document.addEventListener("DOMContentLoaded", init);
   // 若脚本在 DOMContentLoaded 之后才执行
   if(document.readyState!=="loading") init();
-  // 页面关闭/切换前自动同步（在用户交互上下文中，浏览器不会剥离 Authorization 头）
+  // 页面关闭/切换前：若有未推送的改动，自动补一次（安全网，不会与手动推送并发）
   window.addEventListener("beforeunload", function(){
-    if(App.cloudSync && App.cloudSync.enabled() && !App.cloudSync.suppress()) App.cloudSync.pushOnce();
+    if(App.cloudSync && App.cloudSync.enabled() && App.cloudSync.isDirty()) App.cloudSync.pushOnce();
   });
   // 页面隐藏时也尝试同步（手机端切换 App 时触发）
   window.addEventListener("pagehide", function(){
-    if(App.cloudSync && App.cloudSync.enabled() && !App.cloudSync.suppress()) App.cloudSync.pushOnce();
+    if(App.cloudSync && App.cloudSync.enabled() && App.cloudSync.isDirty()) App.cloudSync.pushOnce();
   });
 })();
 
