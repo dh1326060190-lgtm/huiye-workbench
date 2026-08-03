@@ -783,7 +783,7 @@ a{color:inherit;text-decoration:none;}
   App.todayStr = todayStr;
   App.TODAY = todayStr();
   App.refreshToday = function(){ App.TODAY = todayStr(); App.todayNum = ts(App.TODAY); return App.TODAY; };
-  App.BUILD = "2026-08-02.22";
+  App.BUILD = "2026-08-02.23";
 
   const clone = (o)=>JSON.parse(JSON.stringify(o));
 
@@ -1015,6 +1015,14 @@ a{color:inherit;text-decoration:none;}
   // ---------- date helpers ----------
   function parseD(s){ const p=String(s).slice(0,10).split("-").map(Number); return new Date(p[0],p[1]-1,p[2]); }
   function ts(s){ return Math.floor(parseD(s).getTime()/86400000); }
+  // 解析完整截止时间（支持 YYYY-MM-DDTHH:MM / YYYY-MM-DD HH:MM / YYYY-MM-DD），缺时间默认当天 23:59
+  function parseFull(s){
+    const str=String(s==null?"":s).replace(" ","T");
+    const m=/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{1,2}):(\d{2}))?/.exec(str);
+    if(!m) return NaN;
+    const t=new Date(+m[1], +m[2]-1, +m[3], m[4]!=null?+m[4]:23, m[5]!=null?+m[5]:59);
+    return isNaN(t.getTime())?NaN:t.getTime();
+  }
   App.todayNum = ts(App.TODAY);
   App.daysLeft = function(dateStr){ return ts(dateStr) - App.todayNum; };
   App.fmtMoney = function(n){ return "¥" + Math.round(n).toLocaleString("zh-CN"); };
@@ -1079,7 +1087,9 @@ a{color:inherit;text-decoration:none;}
     },
     taskDisplayStatus(t){
       if(t.status==="已完成") return "已完成";
-      if(ts(t.due) < App.todayNum) return "逾期";
+      // 逾期 = 截止时间（精确到时分）已过去，而非只看日期；改了截止时间即可即时清除
+      const dueMs=parseFull(t.due);
+      if(!isNaN(dueMs) && dueMs < Date.now()) return "逾期";
       return t.status;
     },
     // 短视频复盘：聚合看板
