@@ -787,7 +787,7 @@ a{color:inherit;text-decoration:none;}
       if(App.ui && App.ui.toast) App.ui.toast("⚠️ 本地存储已满，本次修改可能未保存。请到「系统设置 → 数据」导出备份并删减素材图片",4200);
       else console.warn("save failed", e);
     }
-    if(App.cloudSync && !App.cloudSync.suppress()) App.cloudSync.schedulePush();
+    if(App.cloudSync && !App.cloudSync.suppress() && !App._syncApply) App.cloudSync.schedulePush();
   }
   App.STORAGE_KEY = KEY;
   App.dataUsage = function(){ try{ const v=localStorage.getItem(KEY)||""; const kb=new Blob([v]).size/1024; return (kb>1024?(kb/1024).toFixed(2)+" MB":Math.round(kb)+" KB")+" / 5 MB"; }catch(e){ return "未知"; } };
@@ -825,8 +825,40 @@ a{color:inherit;text-decoration:none;}
     function b64encode(str){ return btoa(unescape(encodeURIComponent(str))); }
     function b64decode(b64){ return decodeURIComponent(escape(atob(b64))); }
     function hash(str){ return btoa(unescape(encodeURIComponent(str))).slice(0,20); }
+    // ---------- 双向合并助手 ----------
+    function cloneObj(o){ try{ return JSON.parse(JSON.stringify(o)); }catch(e){ return {}; } }
+    function idsOf(arr){ const s=new Set(); (arr||[]).forEach(x=>{ if(x&&x.id!=null) s.add(x.id); }); return s; }
+    function hasLocalOnly(local, remote){
+      for(const k in local){
+        if(Array.isArray(local[k]) && Array.isArray(remote[k])){
+          const rm=idsOf(remote[k]);
+          for(const x of local[k]){ if(x&&x.id!=null && !rm.has(x.id)) return true; }
+        }
+      }
+      return false;
+    }
+    // 双向合并：preferLocal=true 用于推送（本地改动优先），false 用于拉取（远端改动优先）；各自独有的记录都保留
+    function mergeState(local, remote, preferLocal){
+      const out = cloneObj(remote);
+      for(const k in local){
+        if(k==="settings") continue;
+        const lv=local[k], rv=(remote&&remote[k]!==undefined)?remote[k]:undefined;
+        if(Array.isArray(lv)){
+          const map=new Map();
+          (Array.isArray(rv)?rv:[]).forEach(x=>{ if(x&&x.id!=null) map.set(x.id,x); });
+          lv.forEach(x=>{ if(x&&x.id!=null){ if(map.has(x.id)){ if(preferLocal) map.set(x.id,x); } else { map.set(x.id,x); } } });
+          out[k]=[...map.values()];
+        } else if(lv!==undefined){
+          out[k] = preferLocal ? lv : (rv!==undefined?rv:lv);
+        }
+      }
+      const settings = Object.assign({}, (remote&&remote.settings)||{}, (local&&local.settings)||{});
+      settings.githubToken = (local&&local.settings&&local.settings.githubToken) || (remote&&remote.settings&&remote.settings.githubToken) || "";
+      out.settings = settings;
+      return out;
+    }
 
-    // 推送数据到 GitHub 仓库
+    // 推送数据到 GitHub 仓库（推送前先合并远端，不覆盖另一端新增）
     async function pushOnce(){
       const c = cfg();
       if(!c.token || !c.repo){
@@ -836,35 +868,43 @@ a{color:inherit;text-decoration:none;}
       if(pushing) return;
       pushing=true;
       try{
-        const content = JSON.stringify(store.state, (k,v)=> (k==="githubToken")?undefined:v, 2);
-        // 先 GET 获取当前文件的 sha（文件不存在时跳过）
-        let sha = null;
-        try{
-          const getRes = await fetch(apiUrl(c,true), {headers: headers(c)});
-          if(getRes.ok){
-            const fileData = await getRes.json();
-            sha = fileData.sha || null;
+        let attempt=0;
+        while(attempt<2){
+          attempt++;
+          // 先取远端最新，合并后再推，避免覆盖手机端新增
+          let sha=null, remote=null;
+          try{
+            const getRes = await fetch(apiUrl(c,true), {headers: headers(c)});
+            if(getRes.ok){ const fd=await getRes.json(); sha=fd.sha||null; if(fd.content) remote=JSON.parse(b64decode(fd.content.replace(/\n/g,""))); }
+          }catch(e){ /* 远端可能为空 */ }
+          const base = remote ? mergeState(store.state, remote, true) : store.state; // 本地优先
+          const content = JSON.stringify(base, (k,v)=> (k==="githubToken")?undefined:v, 2);
+          const body = {
+            message: "workbench sync " + new Date().toISOString().slice(0,19).replace("T"," "),
+            content: b64encode(content),
+            branch: c.branch
+          };
+          if(sha) body.sha = sha;
+          const res = await fetch(apiUrl(c,false), {
+            method: "PUT",
+            headers: Object.assign(headers(c), {"Content-Type":"application/json"}),
+            body: JSON.stringify(body)
+          });
+          if(res.status===409 && attempt===1){ continue; } // 远端被改动，重试一次
+          if(!res.ok){
+            const errBody = await res.json().catch(()=>({}));
+            throw new Error("HTTP " + res.status + (errBody.message?": "+errBody.message:""));
           }
-        }catch(e){ /* 文件可能不存在 */ }
-        // PUT 推送
-        const body = {
-          message: "workbench sync " + new Date().toISOString().slice(0,19).replace("T"," "),
-          content: b64encode(content),
-          branch: c.branch
-        };
-        if(sha) body.sha = sha;
-        const res = await fetch(apiUrl(c,false), {
-          method: "PUT",
-          headers: Object.assign(headers(c), {"Content-Type":"application/json"}),
-          body: JSON.stringify(body)
-        });
-        if(!res.ok){
-          const errBody = await res.json().catch(()=>({}));
-          throw new Error("HTTP " + res.status + (errBody.message?": "+errBody.message:""));
+          lastContentHash = hash(content);
+          lastSha = sha;
+          // 把合并后的完整状态写回本地（纳入远端独有记录），标记同步中避免触发再次推送
+          if(remote){
+            App._syncApply = true;
+            try{ App.store.importData(JSON.stringify(base)); } finally { App._syncApply = false; }
+          }
+          if(App.ui&&App.ui.toast) App.ui.toast("☁ 已同步到 GitHub");
+          break;
         }
-        lastContentHash = hash(content);
-        lastSha = sha;
-        if(App.ui&&App.ui.toast) App.ui.toast("☁ 已同步到 GitHub");
       }catch(err){
         let msg = err.message;
         if(msg.includes("401")){
@@ -883,7 +923,7 @@ a{color:inherit;text-decoration:none;}
       if(pushTimer) clearTimeout(pushTimer);
       pushTimer = setTimeout(()=>{ pushTimer=null; pushOnce(); }, 800);
     }
-    // 从 GitHub 拉取数据
+    // 从 GitHub 拉取数据（合并写入，保留本地独有记录）
     async function pull(){
       const c = cfg();
       if(!c.repo){
@@ -902,14 +942,16 @@ a{color:inherit;text-decoration:none;}
         const newHash = hash(content);
         if(newHash === lastContentHash) return true; // 无变化
         suppressFlag = true;
-        // 保留本地 Token，不被云端数据覆盖
-        const localToken = store.state.settings.githubToken;
-        App.store.importData(content);
-        if(localToken) store.state.settings.githubToken = localToken;
+        const remote = JSON.parse(content);
+        const localHasExtra = hasLocalOnly(store.state, remote);
+        const merged = mergeState(store.state, remote, false); // 远端优先，保留本地独有
+        App._syncApply = true;
+        try{ App.store.importData(JSON.stringify(merged)); } finally { App._syncApply = false; }
         lastContentHash = newHash;
         lastSha = data.sha || null;
         setTimeout(()=>{ suppressFlag=false; }, 2000);
         if(App.ui&&App.ui.toast) App.ui.toast("☁ 已从 GitHub 拉取最新数据");
+        if(localHasExtra && enabled()) schedulePush(); // 把本地独有内容补传上去
         return true;
       }catch(e){
         let msg = e.message;
@@ -919,7 +961,7 @@ a{color:inherit;text-decoration:none;}
         return false;
       }
     }
-    // 后台静默拉取：每30秒检查一次，有变化才更新，不弹提示
+    // 后台静默拉取：每120秒检查一次，合并写入，有变化才更新，不弹提示
     async function backgroundPull(){
       const c = cfg();
       if(!pullEnabled()) return;
@@ -931,12 +973,15 @@ a{color:inherit;text-decoration:none;}
         const newHash = hash(content);
         if(newHash === lastContentHash) return; // 无变化
         suppressFlag = true;
-        const localToken = store.state.settings.githubToken;
-        App.store.importData(content);
-        if(localToken) store.state.settings.githubToken = localToken;
+        const remote = JSON.parse(content);
+        const localHasExtra = hasLocalOnly(store.state, remote);
+        const merged = mergeState(store.state, remote, false); // 远端优先，保留本地独有
+        App._syncApply = true;
+        try{ App.store.importData(JSON.stringify(merged)); } finally { App._syncApply = false; }
         lastContentHash = newHash;
         lastSha = data.sha || null;
         setTimeout(()=>{ suppressFlag=false; }, 2000);
+        if(localHasExtra && enabled()) schedulePush(); // 把本地独有内容补传上去
       }catch(e){}
     }
     return {enabled, pullEnabled, suppress, schedulePush, pull, pushOnce, backgroundPull, cfg};
