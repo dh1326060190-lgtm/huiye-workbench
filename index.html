@@ -860,8 +860,40 @@ a{color:inherit;text-decoration:none;}
     function b64encode(str){ return btoa(unescape(encodeURIComponent(str))); }
     function b64decode(b64){ return decodeURIComponent(escape(atob(b64))); }
     function hash(str){ return btoa(unescape(encodeURIComponent(str))).slice(0,20); }
+    // ---------- 双向合并助手 ----------
+    function cloneObj(o){ try{ return JSON.parse(JSON.stringify(o)); }catch(e){ return {}; } }
+    function idsOf(arr){ const s=new Set(); (arr||[]).forEach(x=>{ if(x&&x.id!=null) s.add(x.id); }); return s; }
+    function hasLocalOnly(local, remote){
+      for(const k in local){
+        if(Array.isArray(local[k]) && Array.isArray(remote[k])){
+          const rm=idsOf(remote[k]);
+          for(const x of local[k]){ if(x&&x.id!=null && !rm.has(x.id)) return true; }
+        }
+      }
+      return false;
+    }
+    // 双向合并：preferLocal=true 用于推送（本地改动优先），false 用于拉取（远端改动优先）；各自独有的记录都保留
+    function mergeState(local, remote, preferLocal){
+      const out = cloneObj(remote);
+      for(const k in local){
+        if(k==="settings") continue;
+        const lv=local[k], rv=(remote&&remote[k]!==undefined)?remote[k]:undefined;
+        if(Array.isArray(lv)){
+          const map=new Map();
+          (Array.isArray(rv)?rv:[]).forEach(x=>{ if(x&&x.id!=null) map.set(x.id,x); });
+          lv.forEach(x=>{ if(x&&x.id!=null){ if(map.has(x.id)){ if(preferLocal) map.set(x.id,x); } else { map.set(x.id,x); } } });
+          out[k]=[...map.values()];
+        } else if(lv!==undefined){
+          out[k] = preferLocal ? lv : (rv!==undefined?rv:lv);
+        }
+      }
+      const settings = Object.assign({}, (remote&&remote.settings)||{}, (local&&local.settings)||{});
+      settings.githubToken = (local&&local.settings&&local.settings.githubToken) || (remote&&remote.settings&&remote.settings.githubToken) || "";
+      out.settings = settings;
+      return out;
+    }
 
-    // 推送数据到 GitHub 仓库（乐观并发：每次重试重新取最新 sha，避免 409/422）
+    // 推送数据到 GitHub 仓库（每次重试重新取最新内容并合并后再推，避免覆盖另一端新增）
     async function pushOnce(){
       const c = cfg();
       if(!c.token || !c.repo){
@@ -872,20 +904,29 @@ a{color:inherit;text-decoration:none;}
       pushing=true;
       try{
         const content = JSON.stringify(store.state, (k,v)=> (k==="githubToken")?undefined:v, 2);
-        const b64content = b64encode(content);
         const msg = "workbench sync " + new Date().toISOString().slice(0,19).replace("T"," ");
         const sleep = ms => new Promise(r=>setTimeout(r,ms));
-        async function getSha(){
+        async function getRemote(){
           try{
             const r = await fetch(apiUrl(c,true), {headers: headers(c)});
-            if(r.ok) return (await r.json()).sha || null;
+            if(r.ok){ const j=await r.json(); return {sha:(j&&j.sha)||null, content:(j&&j.content)||null}; }
           }catch(e){}
-          return null;
+          return {sha:null, content:null};
         }
         let res=null;
-        // 最多重试 6 次；每次冲突前重新取 sha，确保用最新版本更新
+        // 最多重试 6 次；每次冲突前重新取最新内容并与本地合并（本地优先）后再推，避免覆盖另一端新增
         for(let i=0; i<6; i++){
-          const sha = await getSha();
+          const got = await getRemote();
+          const sha = got.sha;
+          let baseStr = content;
+          if(got.content){
+            try{
+              const remote = JSON.parse(b64decode(got.content.replace(/\n/g,"")));
+              const merged = mergeState(store.state, remote, true); // 本地优先，保留两端独有
+              baseStr = JSON.stringify(merged, (k,v)=> (k==="githubToken")?undefined:v, 2);
+            }catch(e){}
+          }
+          const b64content = b64encode(baseStr);
           const body = {message:msg, content:b64content, branch:c.branch};
           if(sha) body.sha = sha;              // 已有文件 → 更新；无 sha → 新建
           res = await fetch(apiUrl(c,false), {
@@ -895,14 +936,14 @@ a{color:inherit;text-decoration:none;}
           });
           if(res.ok){
             const j = await res.json().catch(()=>({}));
-            lastContentHash = hash(content);
+            lastContentHash = hash(baseStr);
             lastSha = (j.content && j.content.sha) || null;
             clearDirty();
             if(App.ui&&App.ui.toast) App.ui.toast("☁ 已同步到 GitHub");
             return;
           }
           if(res.status===409 || res.status===422){
-            // 并发冲突：稍等后重新取 sha 再试
+            // 并发冲突：稍等后重新取最新内容再试
             await sleep(300*i + Math.floor(Math.random()*400));
             continue;
           }
@@ -945,9 +986,11 @@ a{color:inherit;text-decoration:none;}
         const newHash = hash(content);
         if(newHash === lastContentHash) return true; // 无变化
         suppressFlag = true;
-        // 保留本地 Token，不被云端数据覆盖
+        // 保留本地 Token，不被云端数据覆盖；合并远端（远端优先），保留本地独有记录
         const localToken = store.state.settings.githubToken;
-        App.store.importData(content);
+        const remote = JSON.parse(content);
+        const merged = mergeState(store.state, remote, false);
+        App.store.importData(JSON.stringify(merged));
         if(localToken) store.state.settings.githubToken = localToken;
         lastContentHash = newHash;
         lastSha = data.sha || null;
@@ -976,7 +1019,9 @@ a{color:inherit;text-decoration:none;}
         if(newHash === lastContentHash) return; // 无变化
         suppressFlag = true;
         const localToken = store.state.settings.githubToken;
-        App.store.importData(content);
+        const remote = JSON.parse(content);
+        const merged = mergeState(store.state, remote, false);
+        App.store.importData(JSON.stringify(merged));
         if(localToken) store.state.settings.githubToken = localToken;
         lastContentHash = newHash;
         lastSha = data.sha || null;
