@@ -528,7 +528,7 @@ a{color:inherit;text-decoration:none;}
     { id:"diet",     name:"饮食打卡",  icon:"🍱", desc:"三餐与热量" },
     { id:"mood",     name:"心情日记",  icon:"🌈", desc:"情绪记录" },
     { id:"review",   name:"每周复盘",  icon:"🔁", desc:"周度回顾" },
-    { id:"svreview", name:"短视频复盘", icon:"📊", desc:"多平台数据复盘" },
+    { id:"svreview", name:"内容复盘", icon:"📊", desc:"视频/图文数据复盘" },
     { id:"material", name:"素材图库",  icon:"🖼️", desc:"设计师素材库" },
     { id:"setting",  name:"系统设置",  icon:"⚙️", desc:"偏好与备份" },
   ];
@@ -551,7 +551,7 @@ a{color:inherit;text-decoration:none;}
       theme:"green",
       remindTask:true, remindSaving:true, remindWedding:true,
       autoBackup:true, lockEnabled:false,
-      githubToken:"", ghLogin:"", ghRepo:"dh1326060150-lgtrn/huiye-workbench", ghBranch:"main", ghPath:"workbench-data.json", cloudSync:false,
+      githubToken:"", ghLogin:"", ghRepo:"DH1326060190-LGTM/DJPT", ghBranch:"main", ghPath:"data.json", cloudSync:true,
     },
     // 1. 今日计划
     todayTasks:[
@@ -809,6 +809,7 @@ a{color:inherit;text-decoration:none;}
       };
     }
     function enabled(){ return cfg().on && cfg().token && cfg().repo; }
+    function pullEnabled(){ return cfg().on && cfg().repo; } // 拉取公开仓库无需 token
     function suppress(){ return suppressFlag; }
 
     function headers(c){
@@ -885,8 +886,8 @@ a{color:inherit;text-decoration:none;}
     // 从 GitHub 拉取数据
     async function pull(){
       const c = cfg();
-      if(!c.token || !c.repo){
-        if(App.ui&&App.ui.toast) App.ui.toast("请先在设置中填写 GitHub Token 和仓库名","warn");
+      if(!c.repo){
+        if(App.ui&&App.ui.toast) App.ui.toast("请先在设置中填写仓库名","warn");
         return false;
       }
       try{
@@ -920,8 +921,8 @@ a{color:inherit;text-decoration:none;}
     }
     // 后台静默拉取：每30秒检查一次，有变化才更新，不弹提示
     async function backgroundPull(){
-      if(!enabled()) return;
       const c = cfg();
+      if(!pullEnabled()) return;
       try{
         const res = await fetch(apiUrl(c,true), {headers: headers(c)});
         if(!res.ok) return;
@@ -938,7 +939,7 @@ a{color:inherit;text-decoration:none;}
         setTimeout(()=>{ suppressFlag=false; }, 2000);
       }catch(e){}
     }
-    return {enabled, suppress, schedulePush, pull, pushOnce, backgroundPull, cfg};
+    return {enabled, pullEnabled, suppress, schedulePush, pull, pushOnce, backgroundPull, cfg};
   })();
 
   const store = {
@@ -1033,7 +1034,8 @@ a{color:inherit;text-decoration:none;}
       const arr=store.state.svreviews||[];
       const total=arr.length;
       const totalPlay=arr.reduce((s,x)=>s+x.play,0);
-      const avgFinish=total?Math.round(arr.reduce((s,x)=>s+x.finish,0)/total):0;
+      const videos=arr.filter(x=>(x.form||"视频")!=="图文");
+      const avgFinish=videos.length?Math.round(videos.reduce((s,x)=>s+x.finish,0)/videos.length):0;
       const eng=arr.reduce((s,x)=>s+(x.like+x.comment+x.fav+x.share),0);
       const avgEng=totalPlay?+(eng/totalPlay*100).toFixed(2):0;
       const byPlat={};
@@ -1041,30 +1043,43 @@ a{color:inherit;text-decoration:none;}
       let bestPlat="-",bestAvg=-1;
       for(const p in byPlat){ const a=byPlat[p].play/byPlat[p].n; if(a>bestAvg){bestAvg=a;bestPlat=p;} }
       const top=arr.slice().sort((a,b)=>b.play-a.play)[0];
-      return {total,totalPlay,avgFinish,avgEng,bestPlat,bestAvg:Math.round(bestAvg),top};
+      return {total,totalPlay,avgFinish,hasVideo:videos.length>0,avgEng,bestPlat,bestAvg:Math.round(bestAvg),top};
     },
-    // 短视频复盘：单条健康度诊断（完播/点赞/评论/收藏/转发）
+    // 短视频复盘：单条健康度诊断（视频：完播/点赞/评论/收藏/转发；图文：点赞/评论/收藏/转发 + 图文专属）
     svDiagnose(e){
       const out=[]; const r=(a,b)=>b?+(a/b*100).toFixed(2):0;
-      if(e.finish<20) out.push({lv:"bad",t:"完播率仅 "+e.finish+"%：开头 3 秒没留住人。前 3 秒必须给强钩子（反差/悬念/利益点），别铺垫。"});
-      else if(e.finish<35) out.push({lv:"warn",t:"完播率 "+e.finish+"% 一般：中段节奏偏慢，可压缩信息、加卡点。"});
-      else out.push({lv:"good",t:"完播率 "+e.finish+"% 优秀，开头和节奏控制得不错。"});
+      const form = e.form || "视频";
+      if(form==="图文"){
+        out.push({lv:"good",t:"图文作品以「收藏率」为核心指标——用户觉得有用才会藏，比点赞更硬核，优先盯收藏。"});
+      }
       const lr=r(e.like,e.play);
       if(lr<3) out.push({lv:"bad",t:"点赞率 "+lr+"% 偏低：内容价值感/情绪共鸣不足，强化「有用 or 有情绪」其中之一。"});
       else if(lr<6) out.push({lv:"warn",t:"点赞率 "+lr+"% 正常，可加一句明确的「觉得有用点个赞」。"});
       else out.push({lv:"good",t:"点赞率 "+lr+"% 优秀，内容认可度高。"});
       const cr=r(e.comment,e.play);
       if(cr<0.3) out.push({lv:"bad",t:"评论率 "+cr+"% 偏低：缺互动钩子。结尾抛具体问题（「你踩过哪个坑？」）引导留言。"});
-      else if(cr<1) out.push({lv:"warn",t:"评论率 "+cr+"% 一般，可在视频中埋 2 个讨论点。"});
+      else if(cr<1) out.push({lv:"warn",t:"评论率 "+cr+"% 一般，可在内容中埋 2 个讨论点。"});
       else out.push({lv:"good",t:"评论率 "+cr+"% 优秀，社区活跃度高。"});
       const fr=r(e.fav,e.play);
-      if(fr<1) out.push({lv:"bad",t:"收藏率 "+fr+"% 偏低：缺实用干货。加清单/模板/步骤图，提升「先藏再说」。"});
-      else if(fr<3) out.push({lv:"warn",t:"收藏率 "+fr+"% 正常，可强化「评论区领 checklist」。"});
-      else out.push({lv:"good",t:"收藏率 "+fr+"% 优秀，实用性强。"});
+      if(form==="图文"){
+        if(fr<2) out.push({lv:"bad",t:"收藏率 "+fr+"% 偏低：图文成败看收藏。缺实用干货，加清单/模板/步骤图，提升「先藏再说」。"});
+        else if(fr<5) out.push({lv:"warn",t:"收藏率 "+fr+"% 正常，可强化「评论区领 checklist / 建议收藏备查」。"});
+        else out.push({lv:"good",t:"收藏率 "+fr+"% 优秀，实用性强，图文核心指标达标！"});
+        out.push({lv:"warn",t:"图文建议：第 1 张图决定点击，放信息量最高 / 最有悬念的图；图片加箭头圈注引导视线；结尾图放「收藏理由」（如『建议收藏备查』）；话题标签组合 3-5 个覆盖搜索词。"});
+      } else {
+        if(fr<1) out.push({lv:"bad",t:"收藏率 "+fr+"% 偏低：缺实用干货。加清单/模板/步骤图，提升「先藏再说」。"});
+        else if(fr<3) out.push({lv:"warn",t:"收藏率 "+fr+"% 正常，可强化「评论区领 checklist」。"});
+        else out.push({lv:"good",t:"收藏率 "+fr+"% 优秀，实用性强。"});
+      }
       const sr=r(e.share,e.play);
       if(sr<0.5) out.push({lv:"bad",t:"转发率 "+sr+"% 偏低：缺共鸣/身份表达点。做「说出了我的心声」型内容更易被转。"});
       else if(sr<2) out.push({lv:"warn",t:"转发率 "+sr+"% 一般，结尾加「转发给需要的朋友」。"});
       else out.push({lv:"good",t:"转发率 "+sr+"% 优秀，自传播性强。"});
+      if(form!=="图文"){
+        if(e.finish<20) out.push({lv:"bad",t:"完播率仅 "+e.finish+"%：开头 3 秒没留住人。前 3 秒必须给强钩子（反差/悬念/利益点），别铺垫。"});
+        else if(e.finish<35) out.push({lv:"warn",t:"完播率 "+e.finish+"% 一般：中段节奏偏慢，可压缩信息、加卡点。"});
+        else out.push({lv:"good",t:"完播率 "+e.finish+"% 优秀，开头和节奏控制得不错。"});
+      }
       return out;
     },
   };
@@ -1320,12 +1335,12 @@ a{color:inherit;text-decoration:none;}
 
     // ---- 短视频复盘 ----
     addSvReview(v){
-      store.state.svreviews.unshift({id:store.uid("sv"),platform:v.platform||"抖音",title:v.title,link:v.link||"",
+      store.state.svreviews.unshift({id:store.uid("sv"),platform:v.platform||"抖音",form:v.form||"视频",title:v.title,link:v.link||"",
         publishDate:v.publishDate||App.TODAY,play:+v.play||0,like:+v.like||0,comment:+v.comment||0,
         fav:+v.fav||0,share:+v.share||0,finish:+v.finish||0,tag:v.tag||"",note:v.note||""}); save();
     },
     updateSvReview(id,v){ const x=store.state.svreviews.find(z=>z.id===id); if(x)Object.assign(x,{
-      platform:v.platform,title:v.title,link:v.link||"",publishDate:v.publishDate,play:+v.play||0,like:+v.like||0,
+      platform:v.platform,form:v.form,title:v.title,link:v.link||"",publishDate:v.publishDate,play:+v.play||0,like:+v.like||0,
       comment:+v.comment||0,fav:+v.fav||0,share:+v.share||0,finish:+v.finish||0,tag:v.tag||"",note:v.note||""}); save(); },
     deleteSvReview(id){ store.state.svreviews=store.state.svreviews.filter(z=>z.id!==id); save(); },
 
@@ -2269,10 +2284,13 @@ a{color:inherit;text-decoration:none;}
       const k=e.target.dataset.set, val=e.target.checked;
       if(k==="cloudSync" && val){
         const s=S().settings;
-        if(!s.githubToken || !s.ghRepo){
-          ui().toast("请先填写 GitHub Token 和仓库名并保存配置，再开启同步","warn");
+        if(!s.ghRepo){
+          ui().toast("请先填写仓库名并保存配置，再开启同步","warn");
           e.target.checked=false;
           return;
+        }
+        if(!s.githubToken){
+          ui().toast("已开启只读同步：自动拉取云端数据，未填 Token 无法推送","warn");
         }
       }
       M().updateSettings({[k]:val});
@@ -2312,24 +2330,24 @@ a{color:inherit;text-decoration:none;}
       const diagHtml=diag.map(d=>`<span class="sv-flag sv-${d.lv}">${d.lv==="good"?"✓":d.lv==="warn"?"!":"✕"} ${App.esc(d.t)}</span>`).join("");
       const linkHtml=v.link?`<a class="link" href="${App.esc(v.link)}" target="_blank" rel="noopener">打开链接 ↗</a>`:`<span class="muted">未填链接</span>`;
       return `<div class="card sv-card">
-        <div class="card-head"><h3>${App.esc(v.platform)} · ${App.esc(v.title)}</h3>
+        <div class="card-head"><h3>${App.esc(v.platform)} · ${App.esc(v.title)} ${v.form==="图文"?'<span class="tag">图文</span>':''}</h3>
           <div class="ops"><button class="link" data-action="sv-edit" data-id="${v.id}">编辑</button><button class="link danger" data-action="sv-del" data-id="${v.id}">删除</button></div></div>
         <div class="card-body">
           <div class="sv-meta">📅 ${App.esc(v.publishDate)} ｜ ${ui().catTag(v.tag||"未分类")} ｜ ${linkHtml}</div>
           <div class="sv-stats">
-            ${svStat("播放",v.play)} ${svStat("点赞",v.like)} ${svStat("评论",v.comment)} ${svStat("收藏",v.fav)} ${svStat("转发",v.share)} ${svStat("完播",v.finish+"%")}
+            ${svStat(v.form==="图文"?"浏览":"播放",v.play)} ${svStat("点赞",v.like)} ${svStat("评论",v.comment)} ${svStat("收藏",v.fav)} ${svStat("转发",v.share)} ${v.form==="图文"?svStat("完播","—"):svStat("完播",v.finish+"%")}
           </div>
           ${diagHtml?`<div class="sv-diag">${diagHtml}</div>`:""}
           ${v.note?`<div class="sv-note">📝 ${App.esc(v.note)}</div>`:""}
         </div></div>`;
     }).join("");
     el.innerHTML=`
-      <div class="page-head"><div><h2>📊 短视频复盘</h2><p>多平台数据复盘 · 自动诊断健康度</p></div>
+      <div class="page-head"><div><h2>📊 内容复盘</h2><p>视频 / 图文数据复盘 · 自动诊断健康度</p></div>
         <div class="head-actions">${ui().btn("＋ 新增发布记录","primary","sv-add")}</div></div>
       <div class="stat-grid">
         ${ui().statCard({label:"发布作品",icon:"🎬",value:ov.total,unit:"条"})}
         ${ui().statCard({label:"总播放",icon:"▶️",value:ov.totalPlay.toLocaleString(),unit:"次"})}
-        ${ui().statCard({label:"平均完播率",icon:"⏱️",value:ov.avgFinish,unit:"%",accent:true})}
+        ${ui().statCard({label:"平均完播率",icon:"⏱️",value:ov.hasVideo?ov.avgFinish:"—",unit:ov.hasVideo?"%":"",accent:true})}
         ${ui().statCard({label:"平均互动率",icon:"💬",value:ov.avgEng,unit:"%"})}
       </div>
       ${ov.bestPlat!=="-"?`<div class="sv-best">🏆 表现最佳平台：<b>${App.esc(ov.bestPlat)}</b>（场均播放 ${ov.bestAvg.toLocaleString()}）${ov.top?` ｜ 爆款：<b>${App.esc(ov.top.title)}</b>（${ov.top.play.toLocaleString()} 播放）`:""}</div>`:""}
@@ -2345,7 +2363,8 @@ a{color:inherit;text-decoration:none;}
   function svForm(v){
     ui().formModal({title:v?"编辑发布记录":"新增发布记录",okText:v?"保存":"添加",value:v||{},fields:[
       {name:"platform",label:"发布平台",type:"select",options:["抖音","小红书","视频号","B站","快手","微博","其他"]},
-      {name:"title",label:"视频标题",type:"text",required:true},
+      {name:"form",label:"内容形式",type:"select",options:["视频","图文"]},
+      {name:"title",label:"内容标题",type:"text",required:true},
       {name:"link",label:"内容链接",type:"text",placeholder:"https://..."},
       {name:"publishDate",label:"发布时间",type:"date"},
       {name:"play",label:"播放量",type:"number"},
@@ -2356,7 +2375,13 @@ a{color:inherit;text-decoration:none;}
       {name:"finish",label:"完播率（%）",type:"number"},
       {name:"tag",label:"选题标签 / 赛道",type:"text",placeholder:"验房 / 备婚 / 本地生活"},
       {name:"note",label:"复盘笔记 / 我的建议",type:"textarea"},
-    ],onSubmit:(f,close)=>{ if(v) M().updateSvReview(v.id,f); else M().addSvReview(f); close(); App.refresh(); ui().toast(v?"已保存":"已添加发布记录"); }});
+    ],onChange:(formEl)=>{
+      const fv=(formEl.querySelector('[name=form]')||{}).value;
+      const finishGrp=formEl.querySelector('[name=finish]'); const fg=finishGrp?finishGrp.closest('.grp'):null;
+      const playGrp=formEl.querySelector('[name=play]'); const pl=playGrp?playGrp.closest('.grp').querySelector('label'):null;
+      if(fv==="图文"){ if(fg) fg.style.display="none"; if(pl) pl.innerHTML='浏览/阅读量'; }
+      else { if(fg) fg.style.display=""; if(pl) pl.innerHTML='播放量'; }
+    },onSubmit:(f,close)=>{ if(v) M().updateSvReview(v.id,f); else M().addSvReview(f); close(); App.refresh(); ui().toast(v?"已保存":"已添加发布记录"); }});
   }
 
   App.pages={
@@ -2456,12 +2481,12 @@ a{color:inherit;text-decoration:none;}
       // 启动时自动从 GitHub 拉取最新数据
       if(App.cloudSync){
         setTimeout(()=>{
-          if(App.cloudSync.enabled()) App.cloudSync.pull();
+          if(App.cloudSync.pullEnabled()) App.cloudSync.pull();
         }, 800);
         // 每 30 秒自动检查 GitHub 是否有新数据
         setInterval(()=>{
-          if(App.cloudSync.enabled()) App.cloudSync.backgroundPull();
-        }, 30000);
+          if(App.cloudSync.pullEnabled()) App.cloudSync.backgroundPull();
+        }, 120000);
       }
     }catch(e){
       var show=function(msg){
