@@ -1,43 +1,40 @@
-// 绘野工作台 Service Worker v6
-// 策略：不缓存HTML，只做离线兜底
-const CACHE_VERSION = 'huiye-v14.0.0';
+// 绘野工作台 Service Worker v15
+const CACHE_VERSION = 'huiye-v15.0.0';
+const PRECACHE = ['index.html', 'manifest.json'];
 
-// 激活时清除所有旧缓存
-self.addEventListener('activate', (event) => {
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(keys.map(k => caches.delete(k)));
-    }).then(() => self.clients.claim())
+    caches.open(CACHE_VERSION).then(c => c.addAll(PRECACHE).catch(() => {})).then(() => self.clients.claim())
   );
 });
 
-// 安装后立即激活
-self.addEventListener('install', () => {
-  self.skipWaiting();
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then(keys => Promise.all(keys.map(k => (k !== CACHE_VERSION ? caches.delete(k) : null))))
+      .then(() => self.clients.claim())
+  );
 });
 
-// 只对静态资源做缓存兜底，HTML始终走网络
 self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  if (request.method !== 'GET') return;
+  const req = event.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
 
-  const url = new URL(request.url);
-  const isHtml = request.headers.get('accept') && request.headers.get('accept').includes('text/html');
-
-  if (isHtml) {
-    // HTML: 始终走网络，不缓存
-    event.respondWith(fetch(request));
+  // 导航请求（打开页面）：网络优先，离线时回退到已缓存的 index.html
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(req)
+        .then(r => { const c = r.clone(); caches.open(CACHE_VERSION).then(cache => cache.put('index.html', c)); return r; })
+        .catch(() => caches.match('index.html').then(m => m || new Response('离线资源不可用', { status: 503, headers: { 'Content-Type': 'text/plain;charset=utf-8' } })))
+    );
     return;
   }
 
-  // JS/CSS/图片等静态资源: 网络优先，离线兜底
+  // 静态资源（JS/CSS/图片等）：网络优先，离线兜底缓存
   event.respondWith(
-    fetch(request)
-      .then(response => {
-        const clone = response.clone();
-        caches.open(CACHE_VERSION).then(cache => cache.put(request, clone));
-        return response;
-      })
-      .catch(() => caches.match(request))
+    fetch(req)
+      .then(r => { const c = r.clone(); caches.open(CACHE_VERSION).then(cache => cache.put(req, c)); return r; })
+      .catch(() => caches.match(req))
   );
 });

@@ -521,14 +521,14 @@ a{color:inherit;text-decoration:none;}
     { id:"today",    name:"今日计划",  icon:"📅", desc:"日程与待办总览" },
     { id:"create",   name:"创作助手",  icon:"✍️", desc:"选题 · 脚本 · 排期" },
     { id:"mp",       name:"公众号管理", icon:"📣", desc:"草稿与发布" },
-    { id:"hot",      name:"全网热点",  icon:"🔥", desc:"实时榜单与选题" },
+    { id:"hot",      name:"全网热点",  icon:"🔥", desc:"示例热点 · 选题灵感" },
     { id:"wedding",  name:"备婚管理",  icon:"💍", desc:"任务 · 预算 · 资料" },
     { id:"saving",   name:"存钱计划",  icon:"💰", desc:"多目标储蓄" },
     { id:"ledger",   name:"智能记账",  icon:"🧾", desc:"收支与联动" },
     { id:"diet",     name:"饮食打卡",  icon:"🍱", desc:"三餐与热量" },
     { id:"mood",     name:"心情日记",  icon:"🌈", desc:"情绪记录" },
-    { id:"review",   name:"每周复盘",  icon:"🔁", desc:"周度回顾" },
-    { id:"svreview", name:"内容复盘", icon:"📊", desc:"视频/图文数据复盘" },
+    { id:"review",   name:"周回顾",   icon:"🔁", desc:"每周回顾记录" },
+    { id:"svreview", name:"数据复盘", icon:"📊", desc:"作品数据复盘" },
     { id:"material", name:"素材图库",  icon:"🖼️", desc:"设计师素材库" },
     { id:"setting",  name:"系统设置",  icon:"⚙️", desc:"偏好与备份" },
   ];
@@ -544,7 +544,7 @@ a{color:inherit;text-decoration:none;}
   ];
   App.WEDDING_BUDGET_CATS = ["装修支出","婚庆支出","四大金刚支出","服饰首饰支出","物料采购支出","其他杂费"];
 
-  App.seed = {
+  App.DEMO_SEED = {
     currentPage:"today",
     settings:{
       userName:"设计师 · Lin",
@@ -752,6 +752,16 @@ a{color:inherit;text-decoration:none;}
     ],
     materialCats:["封面模板","片头片尾","实拍素材","IP 素材","海报源文件","备婚素材","装修素材"],
   };
+  // 首次打开数据骨架：清空所有业务数据为空白，真实数据来自云端同步或「恢复演示数据」
+  App.seed = (function(){
+    const d = JSON.parse(JSON.stringify(App.DEMO_SEED));
+    ["todayTasks","topics","scripts","schedules","articles","hotspots","moods","reviews","svreviews","materials","transactions","savings"].forEach(k=>{ if(d[k]) d[k]=[]; });
+    if(d.wedding){ d.wedding.groups={}; d.wedding.budgetLedger=[]; d.wedding.files=[]; }
+    if(d.diet){ d.diet.today={date:TODAY,meals:{早餐:{done:false,kcal:0,photo:null},午餐:{done:false,kcal:0,photo:null},晚餐:{done:false,kcal:0,photo:null}},target:1800}; d.diet.history=[]; d.diet.weekRate=0; }
+    d.materialCats=[];
+    if(d.settings) d.settings.userName="我的工作台";
+    return d;
+  })();
 })();
 
 </script>
@@ -837,6 +847,17 @@ a{color:inherit;text-decoration:none;}
       }
       return false;
     }
+    function countLocalOnly(local, remote){
+      let n=0;
+      for(const k in local){
+        if(Array.isArray(local[k]) && Array.isArray(remote[k])){
+          const rm=idsOf(remote[k]);
+          for(const x of local[k]){ if(x&&x.id!=null && !rm.has(x.id)) n++; }
+        }
+      }
+      return n;
+    }
+    function totalRecords(st){ let n=0; for(const k in st){ if(Array.isArray(st[k])) n+=st[k].length; } return n; }
     // 双向合并：preferLocal=true 用于推送（本地改动优先），false 用于拉取（远端改动优先）；各自独有的记录都保留
     function mergeState(local, remote, preferLocal){
       const out = cloneObj(remote);
@@ -902,7 +923,8 @@ a{color:inherit;text-decoration:none;}
             App._syncApply = true;
             try{ App.store.importData(JSON.stringify(base)); } finally { App._syncApply = false; }
           }
-          if(App.ui&&App.ui.toast) App.ui.toast("☁ 已同步到 GitHub");
+          const localOnlyCnt = remote ? countLocalOnly(store.state, remote) : 0;
+          if(App.ui&&App.ui.toast) App.ui.toast("☁ 已同步 · 含本地独有 "+localOnlyCnt+" 条");
           break;
         }
       }catch(err){
@@ -944,13 +966,14 @@ a{color:inherit;text-decoration:none;}
         suppressFlag = true;
         const remote = JSON.parse(content);
         const localHasExtra = hasLocalOnly(store.state, remote);
+        const localOnlyCnt = countLocalOnly(store.state, remote);
         const merged = mergeState(store.state, remote, false); // 远端优先，保留本地独有
         App._syncApply = true;
         try{ App.store.importData(JSON.stringify(merged)); } finally { App._syncApply = false; }
         lastContentHash = newHash;
         lastSha = data.sha || null;
         setTimeout(()=>{ suppressFlag=false; }, 2000);
-        if(App.ui&&App.ui.toast) App.ui.toast("☁ 已从 GitHub 拉取最新数据");
+        if(App.ui&&App.ui.toast) App.ui.toast("☁ 已拉取 · 合并 "+totalRecords(merged)+" 条"+(localOnlyCnt?("，本地独有 "+localOnlyCnt+" 条已保留"):""));
         if(localHasExtra && enabled()) schedulePush(); // 把本地独有内容补传上去
         return true;
       }catch(e){
@@ -991,7 +1014,7 @@ a{color:inherit;text-decoration:none;}
     state: load(),
     save,
     uid(p){ return (p||"id") + Math.random().toString(36).slice(2,8) + Date.now().toString(36).slice(-3); },
-    reset(){ App.store.state = clone(App.seed); save(); App.refresh && App.refresh(); },
+    reset(){ App.store.state = clone(App.DEMO_SEED); save(); App.refresh && App.refresh(); },
     // 导出：返回完整 JSON 备份串（githubToken 不导出，避免泄露）
     exportData(){
       const s = JSON.parse(JSON.stringify(store.state));
@@ -1262,6 +1285,8 @@ a{color:inherit;text-decoration:none;}
     publishArticle(id){ const a=store.state.articles.find(x=>x.id===id); if(a)a.status="已发布"; save(); },
 
     // ---- 热点 -> 创作助手 ----
+    addHotspot(v){ const arr=store.state.hotspots; const rank=arr.length?Math.max.apply(null,arr.map(x=>x.rank||0))+1:1; arr.unshift({id:store.uid("h"),rank,title:v.title||"未命名",heat:+v.heat||0,track:v.track||"其他"}); save(); },
+    deleteHotspot(id){ const arr=store.state.hotspots; const i=arr.findIndex(x=>x.id===id); if(i>=0){ arr.splice(i,1); arr.forEach((x,idx)=>{x.rank=idx+1;}); save(); } },
     hotspotToTopic(id){
       const h=store.state.hotspots.find(x=>x.id===id); if(!h)return null;
       const t={id:store.uid("tp"),title:h.title,platform:"小红书",track:h.track,status:"未拍摄",script:"",note:"来自热点榜 #"+h.rank};
@@ -1825,14 +1850,20 @@ a{color:inherit;text-decoration:none;}
       <div class="ops">
         <button class="link" data-action="gen-from-hot" data-id="${h.id}">生成选题+脚本</button>
         <button class="link" data-action="add-from-hot" data-id="${h.id}">加入选题库</button>
+        <button class="link danger" data-action="hot-del" data-id="${h.id}">删除</button>
       </div></div>`).join("");
     el.innerHTML=`
-      <div class="page-head"><div><h2>全网热点</h2><p>实时榜单 · 自动匹配你的赛道</p></div>
-        <div class="head-actions"><span class="muted" id="hotTime">更新于 2026-07-30 10:30</span>${ui().btn("🔄 刷新","ghost","refresh-hot")}</div></div>
+      <div class="page-head"><div><h2>示例热点榜单</h2><p>示例数据 · 可在页面内增删改</p></div>
+        <div class="head-actions">${ui().btn("➕ 新增热点","primary","hot-add")}</div></div>
       <div class="card"><div class="card-head"><h3>🔥 热点榜单 Top 10</h3><span class="sub">自动匹配：装修 / 备婚 / 本地生活</span></div>
         <div class="card-body" style="padding-top:4px"><div class="list">${rows}</div></div></div>`;
     App.bindActions(el,{
-      "refresh-hot":()=>{ document.getElementById("hotTime").textContent="更新于 "+new Date().toLocaleString("zh-CN"); ui().toast("热点已刷新"); },
+      "hot-add":()=>ui().formModal({title:"新增热点",fields:[
+        {name:"title",label:"热点标题",type:"text",required:true},
+        {name:"track",label:"赛道",type:"select",options:["装修","备婚","本地生活","其他"]},
+        {name:"heat",label:"热度（数字）",type:"number"}],
+        onSubmit:v=>{ M().addHotspot(v); App.refresh(); ui().toast("已添加热点"); }}),
+      "hot-del":e=>{ const id=e.currentTarget.dataset.id; ui().confirm({text:"删除该热点？",onOk:()=>{ M().deleteHotspot(id); App.refresh(); ui().toast("已删除"); }}); },
       "gen-from-hot":e=>{ const id=e.currentTarget.dataset.id; const t=M().hotspotToTopic(id); if(!t){ui().toast("生成失败");return;} const sc=M().genScript(t.id); App.refresh(); if(sc){ ui().formModal({title:"🎬 已生成 · "+t.title,size:"lg",okText:"关闭",fields:[{name:"_p",label:"",type:"textarea",value:sc.content}],onSubmit:(vv,cl)=>cl()}); } ui().toast("已生成选题《"+(t&&t.title)+"》并附拍摄+剪辑脚本"); },
       "add-from-hot":e=>{ const t=M().hotspotToTopic(e.currentTarget.dataset.id); App.refresh(); ui().toast("已加入我的选题库"); },
     });
@@ -2183,7 +2214,7 @@ a{color:inherit;text-decoration:none;}
         <div class="ops"><button class="link" data-action="rv-edit" data-id="${r.id}">编辑</button></div></div>
         <div class="card-body">${li(r.done,"本周完成")}${li(r.undone,"本周未完成")}${li([r.problem],"问题总结")}${li(r.plan,"下周改进")}${li(r.goal,"下周目标")}</div></div>`; }).join("");
     el.innerHTML=`
-      <div class="page-head"><div><h2>🔁 每周复盘</h2><p>固定模板 · 持续迭代</p></div>
+      <div class="page-head"><div><h2>🔁 周回顾</h2><p>固定模板 · 持续迭代</p></div>
         <div class="head-actions">${ui().btn("＋ 新增周复盘","primary","rv-add")}</div></div>
       <div class="card" style="margin-bottom:16px"><div class="card-head"><h3>复盘模板</h3></div><div class="card-body" style="color:var(--text-2);line-height:1.9">
         ① 本周完成事项 &nbsp; ② 本周未完成事项 &nbsp; ③ 本周问题总结 &nbsp; ④ 下周改进计划 &nbsp; ⑤ 下周目标</div></div>
@@ -2387,7 +2418,7 @@ a{color:inherit;text-decoration:none;}
         </div></div>`;
     }).join("");
     el.innerHTML=`
-      <div class="page-head"><div><h2>📊 内容复盘</h2><p>视频 / 图文数据复盘 · 自动诊断健康度</p></div>
+      <div class="page-head"><div><h2>📊 数据复盘</h2><p>视频 / 图文数据复盘 · 自动诊断健康度</p></div>
         <div class="head-actions">${ui().btn("＋ 新增发布记录","primary","sv-add")}</div></div>
       <div class="stat-grid">
         ${ui().statCard({label:"发布作品",icon:"🎬",value:ov.total,unit:"条"})}
@@ -2491,8 +2522,43 @@ a{color:inherit;text-decoration:none;}
     document.getElementById("topbar").innerHTML = `
       <div class="title"><h1>${m.name}</h1><span>${m.desc}</span></div>
       <div class="spacer"></div>
-      <div class="global-search">🔍<input placeholder="全局搜索…"></div>`;
+      <div class="global-search">🔍<input id="globalSearch" placeholder="全局搜索…" autocomplete="off"></div>`;
+    const inp=document.getElementById("globalSearch");
+    if(inp){
+      inp.addEventListener("input", ()=>App.runGlobalSearch(inp.value));
+      inp.addEventListener("focus", ()=>{ if(inp.value) App.runGlobalSearch(inp.value); });
+      inp.addEventListener("keydown", e=>{ if(e.key==="Escape") App.hideGlobalSearch(); });
+    }
   }
+  App.runGlobalSearch=function(q){
+    q=(q||"").trim();
+    if(!document.getElementById("sr-style")){ const st=document.createElement("style"); st.id="sr-style"; st.textContent="#searchResults{position:fixed;top:62px;right:18px;width:360px;max-height:62vh;overflow:auto;background:#fff;border:1px solid #e5e7eb;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.16);z-index:9999;display:none;padding:6px}#searchResults .sr-empty{padding:14px;color:#888;font-size:13px}#searchResults .sr-item{display:flex;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;cursor:pointer}#searchResults .sr-item:hover{background:#f3f6f4}#searchResults .sr-ico{font-size:18px}#searchResults .sr-main{flex:1;min-width:0}#searchResults .sr-t{font-size:13.5px;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#searchResults .sr-s{font-size:12px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#searchResults .sr-page{font-size:11px;color:#16a34a;background:#ecfdf3;padding:2px 7px;border-radius:8px;white-space:nowrap}"; document.head.appendChild(st); }
+    let box=document.getElementById("searchResults");
+    if(!box){ box=document.createElement("div"); box.id="searchResults"; document.body.appendChild(box); }
+    if(!q){ box.style.display="none"; return; }
+    const res=App.searchAll(q);
+    if(!res.length){ box.innerHTML='<div class="sr-empty">未找到匹配「'+App.esc(q)+'」</div>'; box.style.display="block"; return; }
+    box.innerHTML=res.map(r=>'<div class="sr-item" data-page="'+r.page+'"><span class="sr-ico">'+r.icon+'</span><div class="sr-main"><div class="sr-t">'+App.esc(r.title)+'</div><div class="sr-s">'+App.esc(r.sub)+'</div></div><span class="sr-page">'+App.esc(r.pageName)+'</span></div>').join("");
+    box.querySelectorAll(".sr-item").forEach(n=>n.addEventListener("click",()=>{ App.store.state.currentPage=n.dataset.page; App.store.save(); App.refresh(); App.hideGlobalSearch(); const i=document.getElementById("globalSearch"); if(i) i.value=""; }));
+    box.style.display="block";
+  };
+  App.hideGlobalSearch=function(){ const b=document.getElementById("searchResults"); if(b) b.style.display="none"; };
+  App.searchAll=function(q){
+    q=(q||"").toLowerCase(); const s=App.store.state; const out=[];
+    const push=(page,icon,pageName,title,sub)=>{ if((title||"").toLowerCase().indexOf(q)>=0||(sub||"").toLowerCase().indexOf(q)>=0) out.push({page:page,icon:icon,pageName:pageName,title:title||"",sub:sub||""}); };
+    (s.todayTasks||[]).forEach(t=>push("today","📅","今日计划",t.title,(t.cat||"")+" · "+(t.status||"")));
+    (s.topics||[]).forEach(t=>push("create","✍️","创作助手",t.title,(t.track||"")+" · "+(t.status||"")));
+    (s.scripts||[]).forEach(t=>push("create","✍️","创作助手",t.title,t.content?t.content.slice(0,40):""));
+    (s.articles||[]).forEach(t=>push("mp","📣","公众号",t.title,t.status||""));
+    (s.hotspots||[]).forEach(t=>push("hot","🔥","示例热点",t.title,t.track||""));
+    (s.reviews||[]).forEach(t=>push("review","🔁","周回顾",t.week,(t.plan||[]).join(" ")));
+    (s.svreviews||[]).forEach(t=>push("svreview","📊","数据复盘",t.title,(t.platform||"")+" · "+(t.tag||"")));
+    (s.materials||[]).forEach(t=>push("material","🖼️","素材库",t.name,t.cat||""));
+    (s.moods||[]).forEach(t=>push("mood","🌈","心情日记",t.text,t.mood||""));
+    const wg=(s.wedding&&s.wedding.groups)?Object.values(s.wedding.groups):[];
+    wg.forEach(g=>{(g||[]).forEach(t=>push("wedding","💍","备婚",t.title,(t.plan||"")+" · "+(t.status||"")));});
+    return out.slice(0,30);
+  };
 
   function renderBottombar(){
     const bar = document.getElementById("bottombar");
@@ -2516,6 +2582,18 @@ a{color:inherit;text-decoration:none;}
     renderTopbar();
   };
 
+  App.startReminders=function(){
+    const st=S().settings; if(!st) return;
+    if(!(st.remindTask||st.remindSaving||st.remindWedding)) return;
+    try{ if("Notification" in window && Notification.permission==="default") Notification.requestPermission(); }catch(e){}
+    const seen=new Set();
+    const notify=(title,body)=>{ if("Notification" in window && Notification.permission==="granted"){ try{ new Notification(title,{body:body}); return; }catch(e){} } if(App.ui&&App.ui.toast) App.ui.toast(title+"："+body); };
+    setInterval(()=>{
+      const s=App.store.state, set=S().settings; if(!s||!set) return;
+      if(set.remindTask){ const now=Date.now(); (s.todayTasks||[]).forEach(t=>{ if(t.status!=="已完成" && t.due && !seen.has(t.id)){ const d=new Date(String(t.due).replace(/-/g,"/")); if(isNaN(d)||d<=now||(d-now)<3600000){ notify("⏰ 待办提醒",t.title+"（"+t.due+"）"); seen.add(t.id); } } }); }
+      if(set.remindWedding && s.wedding && s.wedding.weddingDate){ const wd=new Date(String(s.wedding.weddingDate).replace(/-/g,"/")); const days=Math.ceil((wd-Date.now())/86400000); if(days>=0&&days<=30&&!seen.has("wed"+days)){ notify("💍 备婚倒计时","距离婚礼还有 "+days+" 天"); seen.add("wed"+days); } }
+    }, 60000);
+  };
   function init(){
     try{
       renderNav();
@@ -2523,6 +2601,12 @@ a{color:inherit;text-decoration:none;}
       if(App._noPersist && App.ui && App.ui.toast){
         App.ui.toast("临时模式：本环境无法保存数据，请到「系统设置 → 数据导出」备份", 4200);
       }
+      // 注册 Service Worker（仅 http/https），使 PWA 离线可用
+      if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){
+        navigator.serviceWorker.register("sw.js").catch(()=>{});
+      }
+      // 启动提醒（任务到期 / 备婚倒计时）
+      try{ App.startReminders(); }catch(e){}
       // 启动时自动从 GitHub 拉取最新数据
       if(App.cloudSync){
         setTimeout(()=>{
