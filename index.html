@@ -768,7 +768,7 @@ a{color:inherit;text-decoration:none;}
     const d = JSON.parse(JSON.stringify(App.DEMO_SEED));
     ["todayTasks","topics","scripts","schedules","articles","hotspots","moods","reviews","svreviews","materials","transactions","savings"].forEach(k=>{ if(d[k]) d[k]=[]; });
     if(d.wedding){ d.wedding.groups={}; d.wedding.budgetLedger=[]; d.wedding.files=[]; }
-    if(d.diet){ d.diet.today={date:TODAY,meals:{早餐:{done:false,kcal:0,photo:null},午餐:{done:false,kcal:0,photo:null},晚餐:{done:false,kcal:0,photo:null}},target:1800}; d.diet.history=[]; d.diet.weekRate=0; }
+    if(d.diet){ const _n=new Date(); const _td=_n.getFullYear()+"-"+String(_n.getMonth()+1).padStart(2,"0")+"-"+String(_n.getDate()).padStart(2,"0"); d.diet.today={date:_td,meals:{早餐:{done:false,kcal:0,photo:null},午餐:{done:false,kcal:0,photo:null},晚餐:{done:false,kcal:0,photo:null}},target:1800}; d.diet.history=[]; d.diet.weekRate=0; }
     d.materialCats=[];
     if(d.settings) d.settings.userName="我的工作台";
     return d;
@@ -788,6 +788,19 @@ a{color:inherit;text-decoration:none;}
   App.BUILD = "2026-08-17.1";
 
   const clone = (o)=>JSON.parse(JSON.stringify(o));
+  // 将 DEMO_SEED 里所有 YYYY-MM-DD[ HH:MM] 日期整体平移 offset 天（用于“恢复演示数据”对齐到今天）
+  function shiftDemoDates(obj, offset){
+    if(typeof obj==="string"){
+      return obj.replace(/(\d{4})-(\d{2})-(\d{2})([ T]\d{2}:\d{2})?/g, (m,y,mo,d,rest)=>{
+        const dt=new Date(+y, +mo-1, +d); dt.setDate(dt.getDate()+offset);
+        const p=x=>String(x).padStart(2,"0");
+        return dt.getFullYear()+"-"+p(dt.getMonth()+1)+"-"+p(dt.getDate())+(rest||"");
+      });
+    }
+    if(Array.isArray(obj)) return obj.map(x=>shiftDemoDates(x,offset));
+    if(obj&&typeof obj==="object"){ const o={}; for(const k in obj) o[k]=shiftDemoDates(obj[k],offset); return o; }
+    return obj;
+  }
 
   // ---------- load / save ----------
   function load(){
@@ -1033,7 +1046,15 @@ a{color:inherit;text-decoration:none;}
     state: load(),
     save,
     uid(p){ return (p||"id") + Math.random().toString(36).slice(2,8) + Date.now().toString(36).slice(-3); },
-    reset(){ App.store.state = clone(App.DEMO_SEED); save(); App.refresh && App.refresh(); },
+    reset(){
+      // 把 DEMO_SEED 写死的 2026-07 日期整体平移到“相对今天”，
+      // 避免在任何更晚月份恢复演示数据时，任务/日程全变成“逾期”。
+      const anchor=new Date(2026,6,30); const t=new Date();
+      anchor.setHours(0,0,0,0); t.setHours(0,0,0,0);
+      const offset=Math.round((t-anchor)/86400000);
+      App.store.state = shiftDemoDates(clone(App.DEMO_SEED), offset);
+      save(); App.refresh && App.refresh();
+    },
     // 导出：返回完整 JSON 备份串（githubToken 不导出，避免泄露）
     exportData(){
       const s = JSON.parse(JSON.stringify(store.state));
@@ -1580,7 +1601,9 @@ a{color:inherit;text-decoration:none;}
     deleteTask(id){ store.state.todayTasks=store.state.todayTasks.filter(x=>x.id!==id); save(); },
     clearDoneTasks(){ store.state.todayTasks=store.state.todayTasks.filter(x=>x.status!=="已完成"); save(); },
     quickAddTomorrow(title){
-      store.state.todayTasks.unshift({id:store.uid("t"),title,cat:"生活",due:"2026-07-31 09:00",status:"待办",note:"",remind:false,doneAt:null});
+      const t=new Date(); t.setDate(t.getDate()+1);
+      const due=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0")+" 09:00";
+      store.state.todayTasks.unshift({id:store.uid("t"),title,cat:"生活",due,status:"待办",note:"",remind:false,doneAt:null});
       save();
     },
 
