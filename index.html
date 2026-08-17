@@ -323,6 +323,16 @@ a{color:inherit;text-decoration:none;}
 .switch .slider::before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:var(--shadow-sm);}
 .switch input:checked + .slider{background:var(--green-600);}
 .switch input:checked + .slider::before{transform:translateX(18px);}
+.chips{display:flex;flex-wrap:wrap;gap:8px;}
+.chip{border:1px solid var(--border);background:var(--surface-2);color:var(--text-2);padding:5px 13px;border-radius:999px;font-size:13px;cursor:pointer;transition:.15s;font-weight:600;white-space:nowrap;}
+.chip:hover{border-color:var(--green-500);}
+.chip.active{background:var(--green-600);border-color:var(--green-600);color:#fff;}
+.chip b{font-weight:800;opacity:.85;margin-left:2px;}
+.hot-controls{margin:14px 0;}
+.hot-controls .ctl-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:7px 0;}
+.hot-controls .ctl-label{font-size:13px;color:var(--text-2);font-weight:700;min-width:60px;}
+.hot-controls .sub{font-size:12px;color:var(--text-3);margin-left:auto;}
+.mini-select{border:1px solid var(--border);background:var(--surface-2);color:var(--text);border-radius:8px;padding:5px 9px;font-size:13px;}
 .toggle-line{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;}
 
 /* ---------- Toast ---------- */
@@ -630,6 +640,7 @@ a{color:inherit;text-decoration:none;}
       {id:"h9",rank:9,title:"本地宝藏婚宴酒店盘点",heat:451200,track:"本地生活"},
       {id:"h10",rank:10,title:"备婚期如何兼顾工作不崩溃",heat:412800,track:"本地生活"},
     ],
+    hotMeta:{platform:"all",onlyMyTracks:false,viewTrack:"all",updated:""},
     // 5. 备婚管理
     wedding:{
       weddingDate:"2026-12-20",
@@ -1378,12 +1389,27 @@ a{color:inherit;text-decoration:none;}
   // ====================================================
   App.hotNet = {
     // 按关键词把热搜归类到用户赛道
+    PLATFORMS:[
+      {key:"all",name:"综合"},{key:"baidu",name:"百度"},{key:"weibo",name:"微博"},
+      {key:"douyin",name:"抖音"},{key:"xiaohongshu",name:"小红书"},
+      {key:"zhihu",name:"知乎"},{key:"bilibili",name:"B站"}
+    ],
+    TRACKS:["装修","备婚","本地生活"],
+    // 精准分类：打分制，命中赛道关键词越多越精准；多字符词权重更高，避免误判
     classifyTrack(title){
-      const t = (title||"");
-      if(/装修|家装|家居|新房|户型|建材|软装|隔音|采光|甲醛|物业|搬家|出租|验房|房贷|公积金/.test(t)) return "装修";
-      if(/婚|备婚|婚礼|嫁|娶|领证|婚纱|蜜月|彩礼|婚庆|婚宴|婚戒|钻戒/.test(t)) return "备婚";
-      if(/本地|同城|小区|周边|城市|区县|街道|便民|探店|夜市|菜市场|公园|商圈|遛娃|周末去哪/.test(t)) return "本地生活";
-      return "其他";
+      const t=(title||"").toLowerCase();
+      const dict={
+        "装修":["装修","家装","家居","新房","户型","建材","软装","隔音","采光","甲醛","物业","搬家","出租","验房","房贷","公积金","毛坯","瓷砖","水电","家电","吊顶","收纳","二手房","精装","全屋","定制柜","封窗","地暖","马桶","沙发","床垫","硬装","拆改","隔音棉","封阳台","装修避坑","装修公司","装修报价","装修风格"],
+        "备婚":["婚","备婚","婚礼","嫁","娶","领证","婚纱","蜜月","彩礼","婚庆","婚宴","婚戒","钻戒","喜糖","请柬","四大金刚","婚纱照","婚策","司仪","跟拍","婚车","三金","五金","嫁妆","婚期","订婚","备婚清单","婚纱礼服","婚宴酒店","婚礼策划","备婚攻略"],
+        "本地生活":["本地","同城","小区","周边","城市","区县","街道","便民","探店","夜市","菜市场","公园","商圈","遛娃","周末去哪","city walk","citywalk","周边游","本地宝","社区","街区","市集","夜宵","早市","县城","乡镇","本地探店","本地美食","周末去哪儿"]
+      };
+      let best="其他",bestScore=0;
+      for(const tr of this.TRACKS){
+        let score=0;
+        dict[tr].forEach(k=>{ if(t.indexOf(k.toLowerCase())>=0) score+=(k.length>=2?2:1); });
+        if(score>bestScore){ bestScore=score; best=tr; }
+      }
+      return best;
     },
     // 解析 60s v2 热搜结构（容错）
     _parse60s(d){
@@ -1399,16 +1425,17 @@ a{color:inherit;text-decoration:none;}
         return (arr||[]).map(x=>({title:x.title||"", heat:Math.round(+(x.hotnum||x.hot||0))}));
       }catch(e){ return []; }
     },
-    // 联网抓取：并发多源，任一成功即收集，失败源自动跳过
-    async fetchHotspots(){
-      const sources = [
-        { url:"https://v.api.aa1.cn/api/topbaidu/", parse:this._parseAa1 },
-        { url:"https://60s.viki.moe/v2/weibo", parse:this._parse60s },
-        { url:"https://60s.viki.moe/v2/douyin", parse:this._parse60s },
-        { url:"https://60s.viki.moe/v2/xiaohongshu", parse:this._parse60s },
-        { url:"https://60s.viki.moe/v2/zhihu", parse:this._parse60s },
-        { url:"https://60s.viki.moe/v2/bilibili", parse:this._parse60s },
-      ];
+    // 联网抓取：并发多源；支持「平台切换」与「只看三赛道」精准筛选
+    async fetchHotspots(opts){
+      opts=opts||{};
+      const platform=opts.platform||"all";
+      const onlyMine=!!opts.onlyMyTracks;   // 丢弃「其他」，只保留装修/备婚/本地生活
+      const sixty={weibo:"weibo",douyin:"douyin",xiaohongshu:"xiaohongshu",zhihu:"zhihu",bilibili:"bilibili"};
+      const sources=[];
+      if(platform==="all"||platform==="baidu") sources.push({url:"https://v.api.aa1.cn/api/topbaidu/", parse:this._parseAa1});
+      if(platform==="all"){ for(const k in sixty) sources.push({url:"https://60s.viki.moe/v2/"+k, parse:this._parse60s}); }
+      else if(sixty[platform]){ sources.push({url:"https://60s.viki.moe/v2/"+platform, parse:this._parse60s}); }
+      if(!sources.length) return [];
       const results = await Promise.allSettled(sources.map(async s=>{
         const r = await fetch(s.url, {mode:"cors", cache:"no-store"});
         const txt = await r.text();
@@ -1420,14 +1447,14 @@ a{color:inherit;text-decoration:none;}
         if(res.status==="fulfilled" && Array.isArray(res.value)){
           res.value.forEach(x=>{
             const key=(x.title||"").trim();
-            if(key && !seen.has(key)){ seen.add(key); out.push({title:key, heat:x.heat||0, track:this.classifyTrack(key)}); }
+            if(key && !seen.has(key)){ seen.add(key); const tr=this.classifyTrack(key); if(onlyMine && tr==="其他") return; out.push({title:key, heat:x.heat||0, track:tr}); }
           });
         }
       });
       return out;
     },
     // 本地灵感兜底（联网失败时）
-    localHotSuggestions(){
+    localHotSuggestions(onlyMine){
       const now=new Date(); const m=now.getMonth()+1;
       const base=[
         "小区业主群都在问的装修验收清单",
@@ -1444,7 +1471,15 @@ a{color:inherit;text-decoration:none;}
       if(m>=6&&m<=8) seasonal.push("暑期备婚高峰，酒店档期怎么抢");
       if(m>=9&&m<=11) seasonal.push("金九银十装修季，建材团购防坑");
       if(m===12||m<=2) seasonal.push("年底婚宴档期紧张，提前半年预订");
-      return base.concat(seasonal).map(t=>({title:t, heat:Math.floor(8000+Math.random()*4000), track:this.classifyTrack(t)}));
+      let list=base.concat(seasonal).map(t=>({title:t, heat:Math.floor(8000+Math.random()*4000), track:this.classifyTrack(t)}));
+      if(onlyMine) list=list.filter(x=>x.track!=="其他");
+      return list;
+    },
+    // 是否过期：超过 6 小时视为需要刷新（用于自动每日刷新）
+    isStale(){
+      const u=(S().hotMeta && S().hotMeta.updated)||"";
+      if(!u) return true;
+      return (Date.now()-new Date(u).getTime()) > 6*3600*1000;
     }
   };
 
@@ -2179,14 +2214,19 @@ a{color:inherit;text-decoration:none;}
   /* ---------------- 4. 全网热点 ---------------- */
   function p_hot(el){
     const s=S();
-    const rows=s.hotspots.map(h=>{
+    if(!s.hotMeta) s.hotMeta={platform:"all",onlyMyTracks:true,viewTrack:"all",updated:""};
+    const hm=s.hotMeta;
+    const viewTrack=hm.viewTrack||"all";
+    const all=(s.hotspots||[]);
+    const list=all.filter(h=> viewTrack==="all" || (h.track||"其他")===viewTrack);
+    const rows=list.map(h=>{
       const linked=(h.topics&&h.topics.length)||0;
       const followed=h.followed||linked>0;
       return `<div class="row" data-search="${App.esc(h.title)}">
       <div class="main" style="display:flex;gap:12px;align-items:center">
-        <span style="font-size:18px;font-weight:800;color:${h.rank<=3?'var(--danger)':'var(--text-3)'};min-width:22px">${h.rank}</span>
+        <span style="font-size:18px;font-weight:800;color:${h.rank<=3?'var(--danger)':'var(--text-3)'};min-width:22px">${h.rank||""}</span>
         <div><div class="title">${App.esc(h.title)} ${followed?'<span class="tag done">已跟 ✓</span>':''} ${linked?`<span class="tag cat">关联${linked}选题</span>`:''}</div>
-        <div class="meta"><span>🔥 热度 ${h.heat.toLocaleString()}</span>${ui().catTag(["装修","备婚","本地生活","其他"].includes(h.track)?h.track:"装修")}</div></div>
+        <div class="meta"><span>🔥 热度 ${(h.heat||0).toLocaleString()}</span>${ui().catTag(["装修","备婚","本地生活","其他"].includes(h.track)?h.track:"装修")}</div></div>
       </div>
       <div class="ops">
         <button class="link" data-action="hot-toggle" data-id="${h.id}">${followed?'取消已跟':'标记已跟'}</button>
@@ -2195,12 +2235,29 @@ a{color:inherit;text-decoration:none;}
         <button class="link danger" data-action="hot-del" data-id="${h.id}">删除</button>
       </div></div>`;
     }).join("");
+    const trackChips=["all","装修","备婚","本地生活","其他"].map(t=>{
+      const cnt = t==="all"? all.length : all.filter(x=>(x.track||"其他")===t).length;
+      return `<button class="chip${viewTrack===t?' active':''}" data-action="hot-filter" data-track="${t}">${t==="all"?"全部":t} <b>${cnt}</b></button>`;
+    }).join("");
+    const platOptions=App.hotNet.PLATFORMS.map(p=>`<option value="${p.key}" ${hm.platform===p.key?"selected":""}>${p.name}</option>`).join("");
     el.innerHTML=`
-      <div class="page-head"><div><h2>🔥 热点灵感库</h2><p>联网自动抓取 · 可增删改 · 标记已跟 · 一键转选题</p></div>
+      <div class="page-head"><div><h2>🔥 热点灵感库</h2><p>联网自动抓取 · 按三赛道精准筛选 · 可增删改 · 标记已跟 · 一键转选题</p></div>
         <div class="head-actions">${ui().btn("➕ 新增热点","primary","hot-add")} ${ui().btn("🤖 自动抓取热点","ghost","hot-fetch")}</div></div>
+      <div class="hot-controls card">
+        <div class="ctl-row"><span class="ctl-label">赛道筛选</span><div class="chips">${trackChips}</div></div>
+        <div class="ctl-row"><span class="ctl-label">抓取平台</span>
+          <select id="hotPlat" class="mini-select">${platOptions}</select>
+          <label class="switch"><input type="checkbox" id="hotOnlyMine" ${hm.onlyMyTracks?"checked":""}><span class="slider"></span></label>
+          <span style="font-size:13px;color:var(--text-2)">只看我的三赛道（装修/备婚/本地生活）</span>
+          <span class="sub">${hm.updated?("上次更新 "+new Date(hm.updated).toLocaleString()):"尚未抓取"}</span>
+        </div>
+      </div>
       <div class="card"><div class="card-head"><h3>🔥 热点清单</h3><span class="sub">题材：装修 / 备婚 / 本地生活 / 其他</span></div>
-        <div class="card-body" style="padding-top:4px"><div class="list">${rows}</div></div></div>`;
+        <div class="card-body" style="padding-top:4px"><div class="list">${rows||empty("该赛道暂无热点，点「🤖 自动抓取热点」试试")}</div></div></div>`;
+    const platSel=el.querySelector("#hotPlat"); if(platSel) platSel.onchange=()=>{ hm.platform=platSel.value; save(); };
+    const onlyChk=el.querySelector("#hotOnlyMine"); if(onlyChk) onlyChk.onchange=()=>{ hm.onlyMyTracks=onlyChk.checked; save(); App.refresh(); };
     App.bindActions(el,{
+      "hot-filter":e=>{ hm.viewTrack=e.currentTarget.dataset.track; save(); App.refresh(); },
       "hot-add":()=>ui().formModal({title:"新增热点",fields:[
         {name:"title",label:"热点标题",type:"text",required:true},
         {name:"track",label:"赛道",type:"select",options:["装修","备婚","本地生活","其他"]},
@@ -2212,22 +2269,26 @@ a{color:inherit;text-decoration:none;}
       "add-from-hot":e=>{ const t=M().hotspotToTopic(e.currentTarget.dataset.id); App.refresh(); ui().toast("已加入我的选题库"); },
       "hot-fetch":async ()=>{
         ui().toast("🌐 正在抓取实时热搜…");
-        let list=[];
-        try{ list = await App.hotNet.fetchHotspots(); }catch(e){ list=[]; }
-        let fallback=false;
-        if(!list || !list.length){ list = App.hotNet.localHotSuggestions(); fallback=true; }
-        const existTitles = new Set((S().hotspots||[]).map(x=>(x.title||"").trim()));
+        let list=[],fallback=false;
+        try{ list=await App.hotNet.fetchHotspots({platform:hm.platform,onlyMyTracks:hm.onlyMyTracks}); }catch(e){ list=[]; }
+        if(!list||!list.length){ list=App.hotNet.localHotSuggestions(hm.onlyMyTracks); fallback=true; }
+        const existTitles=new Set((S().hotspots||[]).map(x=>(x.title||"").trim()));
         let added=0;
-        list.forEach(h=>{
-          const key=(h.title||"").trim();
-          if(key && !existTitles.has(key)){ M().addHotspot({title:key, track:h.track||"其他", heat:h.heat||0}); existTitles.add(key); added++; }
-        });
+        list.forEach(h=>{ const key=(h.title||"").trim(); if(key&&!existTitles.has(key)){ M().addHotspot({title:key,track:h.track||"其他",heat:h.heat||0}); existTitles.add(key); added++; } });
+        hm.updated=new Date().toISOString(); save();
         App.refresh();
         if(fallback) ui().toast("联网抓取暂不可用（接口限流/网络），已用本地灵感补充 "+added+" 条");
-        else if(added>0) ui().toast("已抓取并新增 "+added+" 条实时热点（自动去重）");
+        else if(added>0) ui().toast("已抓取并新增 "+added+" 条实时热点（已按赛道归类·自动去重）");
         else ui().toast("抓取完成：无新增（已存在的热点已自动去重）");
       },
     });
+    // 自动每日刷新：数据超 6 小时则在后台静默拉取并合并（默认只看三赛道）
+    if(App.hotNet.isStale()){
+      (async()=>{ try{
+        const r=await App.hotNet.fetchHotspots({platform:hm.platform,onlyMyTracks:hm.onlyMyTracks});
+        if(r&&r.length){ const ex=new Set((S().hotspots||[]).map(x=>(x.title||"").trim())); let n=0; r.forEach(h=>{const k=(h.title||"").trim(); if(k&&!ex.has(k)){M().addHotspot({title:k,track:h.track||"其他",heat:h.heat||0});ex.add(k);n++;}}); hm.updated=new Date().toISOString(); save(); if(n>0) ui().toast("🔥 热榜已自动刷新，新增 "+n+" 条"); App.refresh(); }
+      }catch(e){} })();
+    }
   }
 
   /* ---------------- 5. 备婚管理 ---------------- */
