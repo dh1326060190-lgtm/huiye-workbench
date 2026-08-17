@@ -2959,9 +2959,10 @@ a{color:inherit;text-decoration:none;}
 /* =========================================================
    app.js — 导航渲染 / 路由 / 全局事件绑定 / 初始化
    ========================================================= */
+// S 必须全局可访问（p_hot/p_today 等页面函数在上一 <script> 块中调用它）
+const S = ()=>(App.store&&App.store.state)||{};
 (function(){
   const App = (window.App = window.App || {});
-  const S = ()=>App.store.state;
 
   App.bindActions = function(el, map){
     el.querySelectorAll("[data-action]").forEach(node=>{
