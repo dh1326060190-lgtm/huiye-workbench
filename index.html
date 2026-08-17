@@ -1094,9 +1094,10 @@ a{color:inherit;text-decoration:none;}
       const rate = totalTarget?Math.round(totalSaved/totalTarget*100):0;
       return {active,totalSaved,totalTarget,rate};
     },
-    ledgerMonth(){
-      const m = "2026-07";
-      const tx = store.state.transactions.filter(x=>x.time.slice(0,7)===m);
+    ledgerMonth(target){
+      const now = new Date();
+      const m = (target || now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,"0"));
+      const tx = store.state.transactions.filter(x=>x.time && x.time.slice(0,7)===m);
       const income = tx.filter(x=>x.type==="income").reduce((s,x)=>s+x.amount,0);
       const expense = tx.filter(x=>x.type==="expense").reduce((s,x)=>s+x.amount,0);
       return {income,expense,balance:income-expense};
@@ -2060,7 +2061,8 @@ a{color:inherit;text-decoration:none;}
   function p_saving(el){
     const s=S(), c=C();
     const ov=c.savingOverview();
-    const monthNew=s.savings.reduce((a,g)=>a+g.records.filter(r=>r.time.slice(0,7)==="2026-07").reduce((x,y)=>x+y.amount,0),0);
+    const now=new Date(), curM=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+    const monthNew=s.savings.reduce((a,g)=>a+g.records.filter(r=>r.time && r.time.slice(0,7)===curM).reduce((x,y)=>x+y.amount,0),0);
     const goalCards=s.savings.map(g=>{ const st=c.savingStatus(g);
       return `<div class="card"><div class="card-head"><h3>${App.esc(g.name)}</h3>${ui().tag(st.status)}</div>
         <div class="card-body">
