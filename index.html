@@ -899,7 +899,8 @@ a{color:inherit;text-decoration:none;}
       pushing=true;
       try{
         let attempt=0;
-        while(attempt<2){
+        const maxAttempts = 4; // 多设备场景下冲突常见，多试几次
+        while(attempt < maxAttempts){
           attempt++;
           // 先取远端最新，合并后再推，避免覆盖手机端新增
           let sha=null, remote=null;
@@ -920,7 +921,11 @@ a{color:inherit;text-decoration:none;}
             headers: Object.assign(headers(c), {"Content-Type":"application/json"}),
             body: JSON.stringify(body)
           });
-          if(res.status===409 && attempt===1){ continue; } // 远端被改动，重试一次
+          if(res.status===409 && attempt < maxAttempts){
+            // SHA 冲突（远端被另一台设备更新了），等一小段后用最新 SHA 重试
+            await new Promise(r=>setTimeout(r, 300 * attempt));
+            continue;
+          }
           if(!res.ok){
             const errBody = await res.json().catch(()=>({}));
             throw new Error("HTTP " + res.status + (errBody.message?": "+errBody.message:""));
@@ -944,6 +949,8 @@ a{color:inherit;text-decoration:none;}
           msg = "仓库或文件路径不存在。请检查仓库名是否为 owner/repo 格式，且仓库已创建";
         }else if(msg.includes("403")){
           msg = "没有写入权限。请确认 Token 有 repo 权限，且对该仓库有写权限";
+        }else if(msg.includes("409")){
+          msg = "数据冲突（另一台设备刚更新过）。请先点「立即从 GitHub 拉取」同步最新数据，再推送。若反复出现，可稍等几秒后重试";
         }
         if(App.ui&&App.ui.toast) App.ui.toast("GitHub 同步失败："+msg,"warn",4200);
       }
@@ -2459,7 +2466,11 @@ a{color:inherit;text-decoration:none;}
         const path=el.querySelector("#ghPath").value.trim()||"workbench-data.json";
         if(repo && !repo.includes("/")){ ui().toast("仓库名格式应为 owner/repo","warn"); return; }
         M().updateSettings({githubToken:token, ghRepo:repo, ghBranch:branch, ghPath:path});
-        App.refresh(); ui().toast("GitHub 配置已保存");
+        App.refresh(); ui().toast("GitHub 配置已保存，正在拉取数据…");
+        // 新设备/换浏览器首次保存配置后，立即拉取一次远端数据覆盖本地示例数据
+        setTimeout(()=>{
+          if(App.cloudSync && App.cloudSync.pullEnabled()) App.cloudSync.pull();
+        }, 400);
       },
       "set-export":()=>{ download("工作台数据备份.json",App.store.exportData()); ui().toast("数据已导出为 .json，请随身携带"); },
       "set-import":()=>{ const fi=document.getElementById("setImportFile"); if(fi) fi.click(); },
