@@ -1256,8 +1256,8 @@ a{color:inherit;text-decoration:none;}
       const balance=income-expense;
 
       // 3. 饮食打卡
-      const diets=(s.dietLogs||[]).filter(d=>d.date && d.date>=wStart && d.date<=wEnd);
-      const dietRate=diets.length?Math.round(diets.filter(d=>d.cal&&d.cal>0).length/diets.length*100):0;
+      const diets=(s.diet.history||[]).filter(d=>d.date && d.date>=wStart && d.date<=wEnd);
+      const dietRate=diets.length?Math.round(diets.filter(d=>(d.kcal&&d.kcal>0)||d.rate>=1).length/diets.length*100):0;
 
       // 4. 心情
       const moods=(s.moods||[]).filter(m=>m.date && m.date>=wStart && m.date<=wEnd);
@@ -1747,10 +1747,12 @@ a{color:inherit;text-decoration:none;}
     },
 
     // ---- 饮食打卡 ----
-    toggleMeal(meal){ const m=store.state.diet.today.meals[meal]; if(m){ if(!m.done){m.done=true;m.kcal=m.kcal||420;m.photo=m.photo||"🍽️";} else {m.done=false;m.kcal=0;} } save(); },
-    addDietPhoto(meal){ const m=store.state.diet.today.meals[meal]; if(m){m.done=true;m.photo="📷";m.kcal=m.kcal||420;} save(); },
-    setDietTarget(v){ store.state.diet.today.target=+v||0; save(); },
+    toggleMeal(meal){ const m=store.state.diet.today.meals[meal]; if(m){ if(!m.done){m.done=true;m.kcal=m.kcal||420;m.photo=m.photo||"🍽️";} else {m.done=false;m.kcal=0;} } save(); App.M.recordDietToday(); },
+    addDietPhoto(meal){ const m=store.state.diet.today.meals[meal]; if(m){m.done=true;m.photo="📷";m.kcal=m.kcal||420;} save(); App.M.recordDietToday(); },
+    setDietTarget(v){ store.state.diet.today.target=+v||0; save(); App.M.recordDietToday(); },
     deleteDietHistory(date){ store.state.diet.history=store.state.diet.history.filter(h=>h.date!==date); save(); },
+    // 把当天饮食打卡归档进 history（按 date upsert），周复盘/周回顾才能读到真实打卡率
+    recordDietToday(){ const d=store.state.diet.today; if(!d||!d.meals) return; const kcal=Object.values(d.meals).reduce((a,m)=>a+((m.done?m.kcal:0)||0),0); const done=Object.values(d.meals).filter(m=>m.done).length; const rate=+((done/3).toFixed(2)); const hist=store.state.diet.history||(store.state.diet.history=[]); const i=hist.findIndex(h=>h.date===d.date); const rec={date:d.date,kcal,rate}; if(i>=0) hist[i]=rec; else hist.unshift(rec); save(); },
 
     // ---- 心情日记 ----
     addMood(v){ store.state.moods.unshift({id:store.uid("m"),date:v.date,mood:v.mood,weather:v.weather,text:v.text}); save(); },
