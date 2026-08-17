@@ -2149,7 +2149,7 @@ a{color:inherit;text-decoration:none;}
     const months=[]; for(let i=5;i>=0;i--){ const d=new Date(2026,6-i,1); months.push(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")); }
     const mm={}; s.transactions.filter(x=>x.type==="expense").forEach(x=>{ const m=x.time.slice(0,7); mm[m]=(mm[m]||0)+x.amount; });
     const series=months.map(m=>mm[m]||0);
-    const rows=s.transactions.map(t=>`<div class="row" data-search="${App.esc(t.cat+t.note)}">
+    const rows=[...s.transactions].sort((a,b)=>(b.time||"").localeCompare(a.time||"")).map(t=>`<div class="row" data-search="${App.esc(t.cat+t.note)}">
       <div class="main"><div class="title">${App.esc(t.cat)} ${t.toWedding?ui().catTag("备婚"):""} ${t.toSaving?ui().catTag("储蓄"):""}</div>
       <div class="meta"><span>📅 ${App.esc(t.time)}</span><span>${App.esc(t.note)}</span></div></div>
       <span class="amount ${t.type==="income"?"in":"out"}">${t.type==="income"?"+":"-"}${App.fmtMoney(t.amount)}</span>
