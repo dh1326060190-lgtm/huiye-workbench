@@ -372,6 +372,15 @@ a{color:inherit;text-decoration:none;}
 .sv-good{background:var(--green-050);color:var(--green-800);border-color:var(--green-500)}
 .sv-best{background:var(--green-050);border:1px solid var(--green-100);border-radius:12px;padding:12px 14px;margin:14px 0;font-size:13.5px;color:var(--text-2)}
 .sv-best b{color:var(--green-800)}
+.sv-tr{margin-bottom:14px}
+.sv-tr .sv-trk{display:block;font-size:12.5px;color:var(--text-3);margin-bottom:4px}
+.sv-months{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:11px;color:var(--text-3)}
+.sv-ov{font-size:14px;color:var(--text-2);margin-bottom:12px}
+.sv-ov b{font-size:26px;color:var(--green-700);margin:0 4px}
+.sv-ov small{color:var(--text-3)}
+.sv-hrow{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.sv-hname{font-weight:600;min-width:64px}
+.sv-hmeta{font-size:11.5px;color:var(--text-3);width:100%;padding-left:74px;margin-top:-4px}
 .sv-note{font-size:13px;color:var(--text-2);background:var(--surface-2);border-radius:8px;padding:8px 10px;border:1px solid var(--border-2)}
 .sv-card .card-head h3{font-size:14.5px}
 
@@ -521,7 +530,7 @@ a{color:inherit;text-decoration:none;}
     { id:"today",    name:"今日计划",  icon:"📅", desc:"日程与待办总览" },
     { id:"create",   name:"创作助手",  icon:"✍️", desc:"选题 · 脚本 · 排期" },
     { id:"mp",       name:"公众号管理", icon:"📣", desc:"草稿与发布" },
-    { id:"hot",      name:"全网热点",  icon:"🔥", desc:"示例热点 · 选题灵感" },
+    { id:"hot",      name:"热点灵感",  icon:"🔥", desc:"可跟热点 · 选题来源" },
     { id:"wedding",  name:"备婚管理",  icon:"💍", desc:"任务 · 预算 · 资料" },
     { id:"saving",   name:"存钱计划",  icon:"💰", desc:"多目标储蓄" },
     { id:"ledger",   name:"智能记账",  icon:"🧾", desc:"收支与联动" },
@@ -1150,6 +1159,45 @@ a{color:inherit;text-decoration:none;}
       }
       return out;
     },
+    // 数据复盘：按月聚合趋势（播放/互动率/完播率）
+    svTrend(){
+      const arr=(store.state.svreviews||[]).filter(x=>x.play>0).slice().sort((a,b)=>ts(a.publishDate)-ts(b.publishDate));
+      if(!arr.length) return null;
+      const map={};
+      arr.forEach(x=>{ const m=String(x.publishDate||"").slice(0,7); if(!/^\d{4}-\d{2}$/.test(m))return; (map[m]=map[m]||[]).push(x); });
+      const months=Object.keys(map).sort();
+      if(!months.length) return null;
+      const play=months.map(m=>map[m].reduce((s,x)=>s+x.play,0));
+      const eng=months.map(m=>{ const t=map[m]; const p=t.reduce((s,x)=>s+x.play,0)||1; return +(t.reduce((s,x)=>s+x.like+x.comment+x.fav+x.share,0)/p*100).toFixed(2); });
+      const finRaw=months.map(m=>{ const t=map[m].filter(x=>(x.form||"视频")!=="图文"); return t.length?Math.round(t.reduce((s,x)=>s+x.finish,0)/t.length):null; });
+      const hasFin=finRaw.some(x=>x!=null);
+      let last=0; const fin=finRaw.map(x=>{ if(x==null)return last; last=x; return x; });
+      return {months,play,eng,fin,hasFin};
+    },
+    // 数据复盘：平台健康分（综合播放/互动/完播/收藏，满分 100）
+    svHealth(){
+      const arr=store.state.svreviews||[];
+      if(!arr.length) return null;
+      const byPlat={};
+      arr.forEach(x=>{ (byPlat[x.platform]=byPlat[x.platform]||[]).push(x); });
+      const rows=Object.keys(byPlat).map(p=>{
+        const t=byPlat[p];
+        const plays=t.reduce((s,x)=>s+x.play,0);
+        const avgPlay=Math.round(plays/(t.length||1));
+        const eng=plays?+(t.reduce((s,x)=>s+x.like+x.comment+x.fav+x.share,0)/plays*100).toFixed(2):0;
+        const vids=t.filter(x=>(x.form||"视频")!=="图文");
+        const fin=vids.length?Math.round(vids.reduce((s,x)=>s+x.finish,0)/vids.length):null;
+        const favRate=plays?+(t.reduce((s,x)=>s+x.fav,0)/plays*100).toFixed(2):0;
+        const sPlay=Math.min(100,Math.round(Math.log10(avgPlay+10)/Math.log10(200010)*100));
+        const sEng=Math.min(100,Math.round(eng/15*100));
+        const sFin=fin==null?0:Math.min(100,Math.round(fin/50*100));
+        const sFav=Math.min(100,Math.round(favRate/10*100));
+        const score=Math.round(sPlay*0.25+sEng*0.3+sFin*0.25+sFav*0.2);
+        return {platform:p,score,avgPlay,eng,fin,favRate,n:t.length};
+      }).sort((a,b)=>b.score-a.score);
+      const overall=Math.round(rows.reduce((s,x)=>s+x.score,0)/rows.length);
+      return {rows,overall};
+    },
   };
 
   // ====================================================
@@ -1255,7 +1303,7 @@ a{color:inherit;text-decoration:none;}
     // ---- 创作助手 ----
     addTopic(v){
       store.state.topics.unshift({id:store.uid("tp"),title:v.title,platform:v.platform,
-        track:v.track,status:"未拍摄",script:"",note:""}); save();
+        track:v.track,status:v.status||"未拍摄",script:"",note:"",fromHot:v.fromHot||null}); save();
     },
     updateTopic(id,v){ const t=store.state.topics.find(x=>x.id===id); if(t)Object.assign(t,v); save(); },
     deleteTopic(id){ store.state.topics=store.state.topics.filter(x=>x.id!==id); save(); },
@@ -1285,13 +1333,16 @@ a{color:inherit;text-decoration:none;}
     publishArticle(id){ const a=store.state.articles.find(x=>x.id===id); if(a)a.status="已发布"; save(); },
 
     // ---- 热点 -> 创作助手 ----
-    addHotspot(v){ const arr=store.state.hotspots; const rank=arr.length?Math.max.apply(null,arr.map(x=>x.rank||0))+1:1; arr.unshift({id:store.uid("h"),rank,title:v.title||"未命名",heat:+v.heat||0,track:v.track||"其他"}); save(); },
+    addHotspot(v){ const arr=store.state.hotspots; const rank=arr.length?Math.max.apply(null,arr.map(x=>x.rank||0))+1:1; arr.unshift({id:store.uid("h"),rank,title:v.title||"未命名",heat:+v.heat||0,track:v.track||"其他",followed:false,topics:[]}); save(); },
     deleteHotspot(id){ const arr=store.state.hotspots; const i=arr.findIndex(x=>x.id===id); if(i>=0){ arr.splice(i,1); arr.forEach((x,idx)=>{x.rank=idx+1;}); save(); } },
     hotspotToTopic(id){
       const h=store.state.hotspots.find(x=>x.id===id); if(!h)return null;
-      const t={id:store.uid("tp"),title:h.title,platform:"小红书",track:h.track,status:"未拍摄",script:"",note:"来自热点榜 #"+h.rank};
-      store.state.topics.unshift(t); save(); return t;
+      const t={id:store.uid("tp"),title:h.title,platform:"小红书",track:h.track,status:"未拍摄",script:"",note:"来自热点：「"+h.title+"」",fromHot:h.id};
+      store.state.topics.unshift(t);
+      h.followed=true; (h.topics=h.topics||[]).push(t.id); save(); return t;
     },
+    toggleHotFollowed(id){ const h=store.state.hotspots.find(x=>x.id===id); if(h){ h.followed=!h.followed; save(); } },
+    linkTopicToHot(topicId,hotId){ const t=store.state.topics.find(x=>x.id===topicId); const h=store.state.hotspots.find(x=>x.id===hotId); if(!t||!h)return; t.fromHot=h.id; (h.topics=h.topics||[]); if(!h.topics.includes(t.id))h.topics.push(t.id); h.followed=true; save(); },
 
     // ---- 备婚管理 ----
     setWeddingBudget(total){ store.state.wedding.totalBudget=+total||0; save(); },
@@ -1642,6 +1693,13 @@ a{color:inherit;text-decoration:none;}
   const App = (window.App = window.App || {});
   const ui = ()=>App.ui, M=()=>App.M, S=()=>App.store.state, C=()=>App.calc;
   const PALETTE=["#2d6a4f","#52b788","#e8920c","#2f6fed","#7c5cff","#e5484d","#3b82f6","#95d5b2"];
+  const SCRIPT_TEMPLATES=[
+    {name:"钩子反差型",desc:"开头反差/悬念，留住人",body:"【钩子】反常识结论 / 反差画面（前3秒必出）\n【痛点】观众正在经历的问题\n【干货】3 个可操作要点（带具体数字）\n【避坑】1 个反常识记忆点\n【结尾】关注 + 评论区留需求"},
+    {name:"保姆教程型",desc:"步骤清晰，收藏率高",body:"【结论】先给结果\n【准备】所需物料 / 工具清单\n【步骤】1 / 2 / 3 分步（每步 ≤30s）\n【常见问题】避坑提醒\n【结尾】收藏备查 + 关注"},
+    {name:"真实测评型",desc:"客观对比，信任感强",body:"【引入】我实测了 X 款\n【维度】价格 / 体验 / 性价比 打分\n【结论】谁更值得买\n【适用人群】\n【结尾】评论区扣 1 领清单"},
+    {name:"清单合集型",desc:"信息密度高，易转发",body:"【引子】X 个私藏好物\n1）… 2）… 3）…\n【筛选标准】\n【结尾】转发给需要的朋友"},
+    {name:"观点解读型",desc:"情绪共鸣，涨粉快",body:"【反常识观点】\n【论据】2 个真实案例\n【我的态度】\n【互动】你怎么看？评论区聊"},
+  ];
 
   /* ---------------- 1. 今日计划 ---------------- */
   function p_today(el){
@@ -1714,7 +1772,7 @@ a{color:inherit;text-decoration:none;}
     const s=S();
     const topicRows=s.topics.map(t=>`<div class="row" data-search="${App.esc(t.title+t.track+t.platform)}">
       <div class="main"><div class="title">${App.esc(t.title)}</div>
-      <div class="meta"><span>📱 ${App.esc(t.platform)}</span><span>${ui().catTag(t.track)}</span></div></div>
+      <div class="meta"><span>📱 ${App.esc(t.platform)}</span><span>${ui().catTag(t.track)}</span>${t.fromHot?`<span class="tag cat">🔥 热点选题</span>`:""}</div></div>
       ${ui().tag(t.status)}
       <div class="ops">
         <button class="link" data-action="edit-topic" data-id="${t.id}">编辑</button>
@@ -1722,9 +1780,9 @@ a{color:inherit;text-decoration:none;}
         <button class="link" data-action="enable-topic" data-id="${t.id}">启用</button>
         <button class="link danger" data-action="del-topic" data-id="${t.id}">删除</button>
       </div></div>`).join("");
-    const scriptRows=s.scripts.map(t=>`<div class="row" data-search="${App.esc(t.title)}">
-      <div class="main"><div class="title">${App.esc(t.title)}</div><div class="meta"><span>🕒 ${App.esc(t.createdAt)}</span></div></div>
-      ${ui().tag(t.status)}<div class="ops"><button class="link" data-action="edit-script" data-id="${t.id}">编辑</button><button class="link danger" data-action="del-script" data-id="${t.id}">删除</button></div></div>`).join("");
+    const scriptRows=s.scripts.map(t=>{ const ch=(t.content||"").replace(/\s/g,"").length; const dur=Math.max(1,Math.round(ch/4)); return `<div class="row" data-search="${App.esc(t.title)}">
+      <div class="main"><div class="title">${App.esc(t.title)}</div><div class="meta"><span>🕒 ${App.esc(t.createdAt)}</span><span>📝 ${ch}字</span><span>⏱ ${dur}秒</span></div></div>
+      ${ui().tag(t.status)}<div class="ops"><button class="link" data-action="edit-script" data-id="${t.id}">编辑</button><button class="link danger" data-action="del-script" data-id="${t.id}">删除</button></div></div>`}).join("");
     const schRows=s.schedules.map(t=>`<div class="row" data-search="${App.esc(t.title)}">
       <div class="main"><div class="title">${App.esc(t.title)}</div><div class="meta"><span>📅 ${App.esc(t.date)}</span></div></div>
       ${ui().tag(t.type==="拍摄"?"进行中":"待整改")}
@@ -1734,6 +1792,7 @@ a{color:inherit;text-decoration:none;}
       <div class="page-head"><div><h2>创作助手</h2><p>选题 · 脚本 · 内容排期 一站式生产</p></div>
         <div class="head-actions">
           <div class="field search"><span>🔍</span><input id="topicSearch" placeholder="搜索选题 / 标签"></div>
+          ${ui().btn("📐 结构模板","ghost","tpl-open")}
           ${ui().btn("批量导入选题","ghost","import-topics")}
           ${ui().btn("导出全部脚本","primary","export-scripts")}
         </div></div>
@@ -1750,15 +1809,22 @@ a{color:inherit;text-decoration:none;}
       "add-topic":()=>ui().formModal({title:"新增选题",fields:[
         {name:"title",label:"选题标题",type:"text",required:true},
         {name:"platform",label:"适用平台",type:"select",options:["抖音","小红书"]},
-        {name:"track",label:"赛道标签",type:"select",options:["装修","验房","备婚","本地生活"]}],
-        onSubmit:v=>{ M().addTopic(v); App.refresh(); ui().toast("选题已入库"); }}),
+        {name:"track",label:"赛道标签",type:"select",options:["装修","验房","备婚","本地生活"]},
+        {name:"fromHot",label:"关联热点（可选）",type:"select",options:[{value:"",label:"不关联"}].concat(s.hotspots.map(h=>({value:h.id,label:h.title})))},
+        {name:"status",label:"状态",type:"select",options:["未拍摄","已拍摄","已发布"]}],
+        onSubmit:v=>{ M().addTopic(v); if(v.fromHot){ const t=store.state.topics[0]; if(t)M().linkTopicToHot(t.id,v.fromHot); } App.refresh(); ui().toast("选题已入库"); }}),
       "edit-topic":e=>{ const t=s.topics.find(x=>x.id===e.currentTarget.dataset.id); ui().formModal({title:"编辑选题",value:t,fields:[
         {name:"title",label:"选题标题",type:"text",required:true},
         {name:"platform",label:"适用平台",type:"select",options:["抖音","小红书"]},
         {name:"track",label:"赛道标签",type:"select",options:["装修","验房","备婚","本地生活"]},
+        {name:"fromHot",label:"关联热点（可选）",type:"select",options:[{value:"",label:"不关联"}].concat(s.hotspots.map(h=>({value:h.id,label:h.title})))},
         {name:"status",label:"状态",type:"select",options:["未拍摄","已拍摄","已发布"]}],
-        onSubmit:v=>{ M().updateTopic(t.id,v); App.refresh(); ui().toast("已保存"); }}); },
+        onSubmit:v=>{ M().updateTopic(t.id,v); if(v.fromHot)M().linkTopicToHot(t.id,v.fromHot); App.refresh(); ui().toast("已保存"); }}); },
       "gen-script":e=>{ M().genScript(e.currentTarget.dataset.id); App.refresh(); ui().toast("脚本已生成并归档"); },
+      "tpl-open":()=>{ ui().formModal({title:"📐 脚本结构模板库",okText:"用此模板新建",size:"lg",fields:[
+        {name:"tp",label:"选择结构模板",type:"select",options:SCRIPT_TEMPLATES.map((t,i)=>({value:String(i),label:t.name+" —— "+t.desc}))},
+        {name:"title",label:"新脚本标题",type:"text",required:true}],
+        onSubmit:v=>{ const t=SCRIPT_TEMPLATES[+v.tp]; M().addScript({title:v.title||t.name,content:t.body}); App.refresh(); ui().toast("已按模板创建脚本"); }}); },
       "enable-topic":e=>{ M().enableTopic(e.currentTarget.dataset.id); App.refresh(); ui().toast("已标记为已拍摄"); },
       "del-topic":e=>{ const id=e.currentTarget.dataset.id; ui().confirm({text:"删除该选题？",onOk:()=>{ M().deleteTopic(id); App.refresh(); ui().toast("已删除"); }}); },
       "add-script":()=>ui().formModal({title:"新建空白脚本",fields:[
@@ -1841,21 +1907,26 @@ a{color:inherit;text-decoration:none;}
   /* ---------------- 4. 全网热点 ---------------- */
   function p_hot(el){
     const s=S();
-    const rows=s.hotspots.map(h=>`<div class="row" data-search="${App.esc(h.title)}">
+    const rows=s.hotspots.map(h=>{
+      const linked=(h.topics&&h.topics.length)||0;
+      const followed=h.followed||linked>0;
+      return `<div class="row" data-search="${App.esc(h.title)}">
       <div class="main" style="display:flex;gap:12px;align-items:center">
         <span style="font-size:18px;font-weight:800;color:${h.rank<=3?'var(--danger)':'var(--text-3)'};min-width:22px">${h.rank}</span>
-        <div><div class="title">${App.esc(h.title)}</div>
-        <div class="meta"><span>🔥 热度 ${h.heat.toLocaleString()}</span>${ui().catTag("备婚"===h.track||"本地生活"===h.track?h.track:"装修")}</div></div>
+        <div><div class="title">${App.esc(h.title)} ${followed?'<span class="tag done">已跟 ✓</span>':''} ${linked?`<span class="tag cat">关联${linked}选题</span>`:''}</div>
+        <div class="meta"><span>🔥 热度 ${h.heat.toLocaleString()}</span>${ui().catTag(["装修","备婚","本地生活","其他"].includes(h.track)?h.track:"装修")}</div></div>
       </div>
       <div class="ops">
+        <button class="link" data-action="hot-toggle" data-id="${h.id}">${followed?'取消已跟':'标记已跟'}</button>
         <button class="link" data-action="gen-from-hot" data-id="${h.id}">生成选题+脚本</button>
         <button class="link" data-action="add-from-hot" data-id="${h.id}">加入选题库</button>
         <button class="link danger" data-action="hot-del" data-id="${h.id}">删除</button>
-      </div></div>`).join("");
+      </div></div>`;
+    }).join("");
     el.innerHTML=`
-      <div class="page-head"><div><h2>示例热点榜单</h2><p>示例数据 · 可在页面内增删改</p></div>
+      <div class="page-head"><div><h2>🔥 热点灵感库</h2><p>可增删改 · 标记已跟 · 一键转选题</p></div>
         <div class="head-actions">${ui().btn("➕ 新增热点","primary","hot-add")}</div></div>
-      <div class="card"><div class="card-head"><h3>🔥 热点榜单 Top 10</h3><span class="sub">自动匹配：装修 / 备婚 / 本地生活</span></div>
+      <div class="card"><div class="card-head"><h3>🔥 热点清单</h3><span class="sub">题材：装修 / 备婚 / 本地生活 / 其他</span></div>
         <div class="card-body" style="padding-top:4px"><div class="list">${rows}</div></div></div>`;
     App.bindActions(el,{
       "hot-add":()=>ui().formModal({title:"新增热点",fields:[
@@ -1863,6 +1934,7 @@ a{color:inherit;text-decoration:none;}
         {name:"track",label:"赛道",type:"select",options:["装修","备婚","本地生活","其他"]},
         {name:"heat",label:"热度（数字）",type:"number"}],
         onSubmit:v=>{ M().addHotspot(v); App.refresh(); ui().toast("已添加热点"); }}),
+      "hot-toggle":e=>{ M().toggleHotFollowed(e.currentTarget.dataset.id); App.refresh(); },
       "hot-del":e=>{ const id=e.currentTarget.dataset.id; ui().confirm({text:"删除该热点？",onOk:()=>{ M().deleteHotspot(id); App.refresh(); ui().toast("已删除"); }}); },
       "gen-from-hot":e=>{ const id=e.currentTarget.dataset.id; const t=M().hotspotToTopic(id); if(!t){ui().toast("生成失败");return;} const sc=M().genScript(t.id); App.refresh(); if(sc){ ui().formModal({title:"🎬 已生成 · "+t.title,size:"lg",okText:"关闭",fields:[{name:"_p",label:"",type:"textarea",value:sc.content}],onSubmit:(vv,cl)=>cl()}); } ui().toast("已生成选题《"+(t&&t.title)+"》并附拍摄+剪辑脚本"); },
       "add-from-hot":e=>{ const t=M().hotspotToTopic(e.currentTarget.dataset.id); App.refresh(); ui().toast("已加入我的选题库"); },
@@ -2401,6 +2473,10 @@ a{color:inherit;text-decoration:none;}
   /* ---------------- 11.5 短视频复盘 ---------------- */
   function p_svreview(el){
     const s=S(), arr=s.svreviews||[], ov=App.calc.svOverview();
+    const trend=App.calc.svTrend(), health=App.calc.svHealth();
+    const dna=arr.filter(x=>{ const eng=(x.like+x.comment+x.fav+x.share)/(x.play||1)*100; const fin=(x.form||"视频")!=="图文"?x.finish:null; return (fin!=null&&fin>=35)||eng>=8; });
+    const dnaAvgFin=(()=>{ const v=dna.filter(x=>(x.form||"视频")!=="图文"); return v.length?Math.round(v.reduce((s,x)=>s+x.finish,0)/v.length):0; })();
+    const dnaAvgEng=dna.length?+(dna.reduce((s,x)=>s+(x.like+x.comment+x.fav+x.share)/(x.play||1)*100,0)/dna.length).toFixed(1):0;
     const rows=arr.map(v=>{
       const diag=App.calc.svDiagnose(v);
       const diagHtml=diag.map(d=>`<span class="sv-flag sv-${d.lv}">${d.lv==="good"?"✓":d.lv==="warn"?"!":"✕"} ${App.esc(d.t)}</span>`).join("");
@@ -2427,12 +2503,43 @@ a{color:inherit;text-decoration:none;}
         ${ui().statCard({label:"平均互动率",icon:"💬",value:ov.avgEng,unit:"%"})}
       </div>
       ${ov.bestPlat!=="-"?`<div class="sv-best">🏆 表现最佳平台：<b>${App.esc(ov.bestPlat)}</b>（场均播放 ${ov.bestAvg.toLocaleString()}）${ov.top?` ｜ 爆款：<b>${App.esc(ov.top.title)}</b>（${ov.top.play.toLocaleString()} 播放）`:""}</div>`:""}
+      ${trend?`<div class="card"><div class="card-head"><h3>📈 数据趋势</h3><span class="sub">按发布月份聚合</span></div>
+        <div class="card-body">
+          <div class="sv-tr"><span class="sv-trk">总播放量</span>${ui().lineChart(trend.play,"#2d6a4f")}</div>
+          <div class="sv-tr"><span class="sv-trk">平均互动率(%)</span>${ui().lineChart(trend.eng,"#e8920c")}</div>
+          ${trend.hasFin?`<div class="sv-tr"><span class="sv-trk">平均完播率(%)</span>${ui().lineChart(trend.fin,"#2f6fed")}</div>`:""}
+          <div class="sv-months">${trend.months.map(m=>`<span>${App.esc(m)}</span>`).join("")}</div>
+        </div></div>`:""}
+      ${health?`<div class="card"><div class="card-head"><h3>🩺 平台健康分</h3><span class="sub">综合播放/互动/完播/收藏 · 满分100</span></div>
+        <div class="card-body">
+          <div class="sv-ov">综合健康分 <b>${health.overall}</b><small>/100</small></div>
+          ${health.rows.map(r=>`<div class="sv-hrow">
+            <span class="sv-hname">${App.esc(r.platform)}</span>
+            <div class="progress-row"><div class="progress thin" style="flex:1"><i style="width:${r.score}%;background:${r.score>=70?'var(--green-600)':r.score>=45?'var(--green-500)':'var(--danger)'}"></i></div><span class="pct">${r.score}</span></div>
+            <span class="sv-hmeta">${r.n}条 · 互动${r.eng}%${r.fin!=null?` · 完播${r.fin}%`:''} · 收藏${r.favRate}%</span>
+          </div>`).join("")}
+        </div></div>`:""}
       <div class="card"><div class="card-head"><h3>发布记录（${arr.length}）</h3><span class="sub">填完数据自动给出专业诊断</span></div>
-        <div class="card-body" style="padding-top:4px">${rows||empty("还没有发布记录，点右上角「＋ 新增发布记录」开始复盘")}</div></div>`;
+        <div class="card-body" style="padding-top:4px">${rows||empty("还没有发布记录，点右上角「＋ 新增发布记录」开始复盘")}</div></div>
+      ${dna.length?`<div class="card"><div class="card-head"><h3>🧬 爆款 DNA 库</h3><span class="sub">命中 ${dna.length} 条 · 平均完播 ${dnaAvgFin}% · 平均互动 ${dnaAvgEng}%</span></div>
+        <div class="card-body" style="padding-top:4px"><div class="list">${dna.map(d=>{
+          const eng=+((d.like+d.comment+d.fav+d.share)/(d.play||1)*100).toFixed(2);
+          const fin=(d.form||"视频")!=="图文"?d.finish:null;
+          const fr=+(d.fav/(d.play||1)*100).toFixed(2);
+          return `<div class="row" data-search="${App.esc(d.title)}">
+            <div class="main"><div class="title">${App.esc(d.platform)} · ${App.esc(d.title)} ${d.form==="图文"?'<span class="tag">图文</span>':''}</div>
+            <div class="meta"><span>完播 ${fin!=null?fin+'%':'—'}</span><span>互动 ${eng}%</span><span>收藏 ${fr}%</span></div>
+            ${d.dnaNote?`<div class="meta" style="color:var(--green-700)">🧬 ${App.esc(d.dnaNote)}</div>`:''}</div>
+            <div class="ops"><button class="link" data-action="sv-dna" data-id="${d.id}">${d.dnaNote?'拆解笔记':'写拆解'}</button></div></div>`;
+        }).join("")}</div></div></div>`:""}
+`;
     App.bindActions(el,{
       "sv-add":()=>svForm(null),
       "sv-edit":e=>{ const v=s.svreviews.find(x=>x.id===e.currentTarget.dataset.id); svForm(v); },
       "sv-del":e=>{ const id=e.currentTarget.dataset.id; ui().confirm({text:"删除该发布记录？",onOk:()=>{ M().deleteSvReview(id); App.refresh(); ui().toast("已删除"); }}); },
+      "sv-dna":e=>{ const v=s.svreviews.find(x=>x.id===e.currentTarget.dataset.id); ui().formModal({title:"🧬 爆款拆解笔记",value:v,fields:[
+        {name:"dnaNote",label:"拆解这条爆款的结构 / 钩子 / 可复用点",type:"textarea",placeholder:"例如：前3秒反差钩子 + 清单体 + 结尾引导收藏"}],
+        onSubmit:f=>{ M().updateSvReview(v.id,{dnaNote:f.dnaNote||""}); App.refresh(); ui().toast("已记录拆解"); }}); },
     });
   }
   function svStat(label,val){ return `<div class="sv-stat"><div class="v">${typeof val==="number"?val.toLocaleString():val}</div><div class="l">${label}</div></div>`; }
@@ -2550,7 +2657,7 @@ a{color:inherit;text-decoration:none;}
     (s.topics||[]).forEach(t=>push("create","✍️","创作助手",t.title,(t.track||"")+" · "+(t.status||"")));
     (s.scripts||[]).forEach(t=>push("create","✍️","创作助手",t.title,t.content?t.content.slice(0,40):""));
     (s.articles||[]).forEach(t=>push("mp","📣","公众号",t.title,t.status||""));
-    (s.hotspots||[]).forEach(t=>push("hot","🔥","示例热点",t.title,t.track||""));
+    (s.hotspots||[]).forEach(t=>push("hot","🔥","热点灵感",t.title,t.track||""));
     (s.reviews||[]).forEach(t=>push("review","🔁","周回顾",t.week,(t.plan||[]).join(" ")));
     (s.svreviews||[]).forEach(t=>push("svreview","📊","数据复盘",t.title,(t.platform||"")+" · "+(t.tag||"")));
     (s.materials||[]).forEach(t=>push("material","🖼️","素材库",t.name,t.cat||""));
