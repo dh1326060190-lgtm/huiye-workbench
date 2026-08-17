@@ -2716,10 +2716,11 @@ a{color:inherit;text-decoration:none;}
       try{ App.startReminders(); }catch(e){}
       // 启动时自动从 GitHub 拉取最新数据
       if(App.cloudSync){
-        setTimeout(()=>{
-          if(App.cloudSync.pullEnabled()) App.cloudSync.pull();
-        }, 800);
-        // 每 30 秒自动检查 GitHub 是否有新数据
+        if(App.cloudSync.pullEnabled()){
+          if(App.ui&&App.ui.toast) App.ui.toast("☁ 正在从 GitHub 拉取数据…","info",1500);
+          setTimeout(()=>{ App.cloudSync.pull(); }, 800);
+        }
+        // 每 120 秒自动检查 GitHub 是否有新数据（静默合并，有变化才刷新）
         setInterval(()=>{
           if(App.cloudSync.pullEnabled()) App.cloudSync.backgroundPull();
         }, 120000);
