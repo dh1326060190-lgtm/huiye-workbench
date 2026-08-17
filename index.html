@@ -1197,6 +1197,180 @@ a{color:inherit;text-decoration:none;}
       const overall=Math.round(rows.reduce((s,x)=>s+x.score,0)/rows.length);
       return {rows,overall};
     },
+
+    // 自动复盘：聚合本周数据生成结构化复盘草稿
+    autoReview(){
+      const s=store.state;
+      const now=new Date();
+      const dow=now.getDay(); // 0=日
+      const mon=new Date(now); mon.setDate(now.getDate()-((dow+6)%7)); // 本周一
+      const sun=new Date(mon); sun.setDate(mon.getDate()+6); // 本周日
+      const fmt=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+      const wStart=fmt(mon), wEnd=fmt(sun);
+      const weekLabel=wStart+" ~ "+wEnd;
+
+      // 1. 任务统计
+      const tasks=(s.todayTasks||[]).filter(t=>t.due && t.due>=wStart && t.due<=wEnd+"T23:59");
+      const doneTasks=tasks.filter(t=>t.status==="已完成");
+      const undoneTasks=tasks.filter(t=>t.status!=="已完成"&&t.status!=="逾期");
+      const overTasks=tasks.filter(t=>t.status==="逾期");
+      const taskRate=tasks.length?Math.round(doneTasks.length/tasks.length*100):0;
+
+      // 2. 收支统计
+      const txs=(s.transactions||[]).filter(t=>t.time && t.time>=wStart && t.time<=wEnd);
+      const income=txs.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
+      const expense=txs.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
+      const balance=income-expense;
+
+      // 3. 饮食打卡
+      const diets=(s.dietLogs||[]).filter(d=>d.date && d.date>=wStart && d.date<=wEnd);
+      const dietRate=diets.length?Math.round(diets.filter(d=>d.cal&&d.cal>0).length/diets.length*100):0;
+
+      // 4. 心情
+      const moods=(s.moods||[]).filter(m=>m.date && m.date>=wStart && m.date<=wEnd);
+      const avgMood=moods.length?+(moods.reduce((s,m)=>s+(m.score||3),0)/moods.length).toFixed(1):0;
+
+      // 5. 内容数据
+      const sv=(s.svreviews||[]).filter(v=>{
+        if(!v.publishDate) return false;
+        const pd=v.publishDate.slice(0,10);
+        return pd>=wStart && pd<=wEnd;
+      });
+      const totalPlay=sv.reduce((s,v)=>s+(v.play||0),0);
+      const bestSv=sv.length?sv.sort((a,b)=>(b.play||0)-(a.play||0))[0]:null;
+
+      // 6. 备婚进度
+      const weddingTasks=(s.weddingTasks||[]);
+      const doneWed=weddingTasks.filter(t=>t.status==="已完成").length;
+      const totalWed=weddingTasks.length;
+      const wedPct=totalWed?Math.round(doneWed/totalWed*100):0;
+
+      // 生成结构化文本
+      const lines=[];
+      lines.push("## 📊 "+weekLabel+" 自动复盘\n");
+
+      // 完成事项
+      const doneList=doneTasks.map(t=>"✅ "+t.title);
+      if(sv.length) sv.forEach(v=>doneList.push("📈 ["+v.platform+"] "+v.title+" · 播放"+(v.play||0)));
+      if(income>0) doneList.push("💰 收入 +"+income+"元");
+      if(doneList.length){
+        lines.push("### ✨ 本周亮点");
+        lines.push(...doneList);
+        lines.push("");
+      }
+
+      // 未完成
+      const undoneList=undoneTasks.map(t=>"⏳ "+t.title+(t.cat?" ["+t.cat+"]":""));
+      if(overTasks.length) overTasks.forEach(t=>undoneList.push("❌ [逾期] "+t.title));
+      if(undoneList.length){
+        lines.push("### ⚠️ 未完成 / 需关注");
+        lines.push(...undoneList);
+        lines.push("");
+      }
+
+      // 数据汇总
+      lines.push("### 📈 数据一览");
+      lines.push("- 任务完成率: **"+taskRate+"%** ("+doneTasks.length+"/"+tasks.length+")");
+      lines.push("- 收支: 收入 ¥"+income+" · 支出 ¥"+expense+" · 结余 ¥"+(balance>=0?balance:"−"+Math.abs(balance)));
+      if(diets.length) lines.push("- 饮食打卡: **"+dietRate+"%** ("+diets.length+"天)");
+      if(moods.length) lines.push("- 平均心情: **"+avgMood+"/5** ("+moods.length+"天记录)");
+      if(sv.length){ lines.push("- 内容数据: "+sv.length+"条发布 · 总播放 "+(totalPlay>=10000?(totalPlay/10000).toFixed(1)+"万":totalPlay)); if(bestSv) lines.push("  - 最佳: "+bestSv.title+" ("+bestSv.platform+" · "+(bestSv.play||0)+")"); }
+      lines.push("- 备婚进度: **"+wedPct+"%** ("+doneWed+"/"+totalWed+")");
+      lines.push("");
+
+      // 改进建议
+      const tips=[];
+      if(taskRate<60) tips.push("任务完成率偏低，建议下周减少每日待办数量、聚焦 3 件最重要的事");
+      if(expense>income*1.5 && income>0) tips.push("本周支出偏高，建议记账分类查看大额支出项");
+      if(dietRate<40 && diets.length>=3) tips.push("饮食打卡不连续，尝试设置固定餐前提醒");
+      if(avgMood && avgMood<2.5) tips.push("本周心情偏低，注意休息和自我关怀");
+      if(!sv.length && totalWed>0) tips.push("本周没有内容发布数据，考虑固定每周 2-3 条更新频率");
+      if(overTasks.length>2) tips.push("逾期任务较多，建议将大任务拆分为小步骤");
+      if(tips.length===0) tips.push("整体表现不错！继续保持当前节奏，可以挑战一个小目标");
+      lines.push("### 💡 下周改进建议");
+      tips.forEach(t=>lines.push("- "+t));
+      lines.push("");
+
+      return {weekLabel,done:[...doneList],undone:[...undoneList],
+        problem:"任务完成率"+taskRate+"% | 收支结余¥"+balance+" | 打卡率"+dietRate+"%\n\n"+tips.map((t,i)=>(i+1)+". "+t).join("\n"),
+        plan:tips.slice(0,3),
+        goal:["提升任务完成率至"+Math.min(100,taskRate+20)+"%", expense>income?"控制支出在收入以内":"保持收支平衡", "完成 "+Math.min(3,undoneList.length)+" 项未完成任务"],
+        stats:{taskRate,income,expense,balance,dietRate,avgMood,svCount:sv.length,totalPlay,wedPct}};
+    },
+
+    // 智能生成计划：分析各模块缺口，均衡分配到下周每天
+    autoPlan(){
+      const s=store.state;
+      const now=new Date();
+      const tomorrow=new Date(now); tomorrow.setDate(now.getDate()+1);
+      // 从下周一到下周日（7天）
+      const nextMon=new Date(tomorrow);
+      while(nextMon.getDay()!==1) nextMon.setDate(nextMon.getDate()+1);
+      const fmt=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+      const days=[]; for(let i=0;i<7;i++){const d=new Date(nextMon); d.setDate(nextMon.getDate()+i); days.push(fmt(d));}
+
+      // 分析各模块缺口
+      const suggestions=[];
+
+      // 1. 逾期/未完成任务
+      const overdue=(s.todayTasks||[]).filter(t=>t.status==="逾期"||t.status==="进行中");
+      overdue.slice(0,5).forEach(t=>suggestions.push({title:t.title+"（续）",cat:t.cat||"工作",priority:3}));
+
+      // 2. 备婚未完成
+      (s.weddingTasks||[]).filter(t=>t.status!=="已完成").slice(0,3).forEach(t=>
+        suggestions.push({title:"备婚："+t.title,cat:"备婚",priority:2}));
+
+      // 3. 内容创作（每周至少2-3条）
+      const recentSv=(s.svreviews||[]).filter(v=>{
+        if(!v.publishDate) return false;
+        const d=new Date(); d.setDate(d.getDate()-7); return v.publishDate>=d.toISOString().slice(0,10);
+      });
+      if(recentSv.length<2){
+        suggestions.push({title:"拍摄/发布 1 条内容",cat:"自媒体",priority:2});
+        suggestions.push({title:"写脚本：选题+大纲",cat:"自媒体",priority:1});
+      }
+
+      // 4. 储蓄存入提醒
+      (s.savings||[]).filter(g=>g.status!=="已达成"&&g.status!=="已过期").forEach(g=>{
+        const needed=g.totalTarget-(g.totalSaved||0);
+        if(needed>0) suggestions.push({title:"存入储蓄："+g.name+"（还需¥"+needed+"）",cat:"储蓄",priority:1});
+      });
+
+      // 5. 热点跟进
+      const hotFollowed=(s.hotspots||[]).filter(h=>h.followed&&!h.topics?.length);
+      hotFollowed.slice(0,2).forEach(h=>
+        suggestions.push({title:"热点选题："+h.title,cat:"自媒体",priority:1}));
+
+      // 6. 每周回顾
+      suggestions.push({title:"周回顾 & 下周规划",cat:"工作",priority:1});
+
+      // 去重 + 排序（优先级高的排前面）
+      const seen=new Set();
+      const uniq=suggestions.filter(x=>{if(seen.has(x.title))return false;seen.add(x.title);return true;});
+      uniq.sort((a,b)=>b.priority-a.priority);
+
+      // 均匀分配到7天（每天2-4项，高优先级先排）
+      const daily=[[],[],[],[],[],[],[]];
+      let dayIdx=0;
+      uniq.forEach(item=>{
+        daily[dayIdx].push(item);
+        dayIdx=(dayIdx+1)%7;
+      });
+
+      // 每天加一条"运动/阅读/放松"
+      const restItems=[
+        {title:"运动 30 分钟",cat:"生活",priority:0},
+        {title:"阅读 / 学习",cat:"生活",priority:0},
+        {title:"整理 / 收纳",cat:"生活",priority:0},
+        {title:"家庭时间",cat:"生活",priority:0},
+        {title:"自由安排 / 放松",cat:"生活",priority:0},
+        {title:"复盘今日",cat:"工作",priority:0},
+        {title:"下周计划准备",cat:"工作",priority:0},
+      ];
+      daily.forEach((list,i)=>{ list.push(restItems[i]); });
+
+      return {days,daily,suggestions:uniq};
+    },
   };
 
   // ====================================================
@@ -1738,12 +1912,36 @@ a{color:inherit;text-decoration:none;}
           <div class="card-body" style="padding-top:4px"><div class="list">${rows||empty("还没有任务，点击下方新增")}</div></div></div>
       </div>
       <div class="head-actions" style="margin-top:18px">
-        ${ui().btn("＋ 新增任务","primary","add-task")}
+        ${ui().btn("🤖 智能生成下周计划","primary","auto-plan")}
+        ${ui().btn("＋ 新增任务","ghost","add-task")}
         ${ui().btn("🧹 一键清空已完成","ghost","clear-done")}
         ${ui().btn("📝 明日计划快速录入","ghost","quick-tomorrow")}
       </div>`;
 
     App.bindActions(el,{
+      "auto-plan":()=>{
+        const plan=App.calc.autoPlan();
+        if(!plan || !plan.suggestions.length){ ui().toast("没有足够的数据生成计划","warn"); return; }
+        const dow=["周一","周二","周三","周四","周五","周六","周日"];
+        let preview="📋 下周计划预览（"+plan.days[0]+" ~ "+plan.days[6]+"）\n\n";
+        let totalAdded=0;
+        plan.daily.forEach((list,di)=>{
+          if(list.length===0) return;
+          preview+="### "+dow[di]+" ("+plan.days[di]+")\n";
+          list.forEach(item=>{
+            preview+="· "+item.title+" ["+(item.cat||"")+"]\n";
+            const due=plan.days[di]+"T09:00";
+            M().addTask({title:item.title,cat:item.cat||"工作",due,status:"待办",remind:true});
+            totalAdded++;
+          });
+          preview+="\n";
+        });
+        ui().confirm({
+          text:preview+"\n共 **"+totalAdded+"** 条任务将添加到今日计划，确认生成？",
+          okText:"确认生成",
+          onOk:()=>{ App.refresh(); ui().toast("✅ 已生成 "+totalAdded+" 条下周计划任务"); }
+        });
+      },
       "add-task":openTaskModal,
       "edit-task":e=>openTaskModal(e.currentTarget.dataset.id),
       "complete-task":e=>{ M().completeTask(e.currentTarget.dataset.id); App.refresh(); ui().toast("状态已更新"); },
@@ -2287,11 +2485,25 @@ a{color:inherit;text-decoration:none;}
         <div class="card-body">${li(r.done,"本周完成")}${li(r.undone,"本周未完成")}${li([r.problem],"问题总结")}${li(r.plan,"下周改进")}${li(r.goal,"下周目标")}</div></div>`; }).join("");
     el.innerHTML=`
       <div class="page-head"><div><h2>🔁 周回顾</h2><p>固定模板 · 持续迭代</p></div>
-        <div class="head-actions">${ui().btn("＋ 新增周复盘","primary","rv-add")}</div></div>
+        <div class="head-actions">${ui().btn("🤖 自动复盘","primary","auto-review")} ${ui().btn("＋ 新增周复盘","ghost","rv-add")}</div></div>
       <div class="card" style="margin-bottom:16px"><div class="card-head"><h3>复盘模板</h3></div><div class="card-body" style="color:var(--text-2);line-height:1.9">
         ① 本周完成事项 &nbsp; ② 本周未完成事项 &nbsp; ③ 本周问题总结 &nbsp; ④ 下周改进计划 &nbsp; ⑤ 下周目标</div></div>
       ${cards||empty("还没有复盘记录")}`;
     App.bindActions(el,{
+      "auto-review":()=>{
+        const draft=App.calc.autoReview();
+        if(!draft){ ui().toast("没有足够的数据生成复盘","warn"); return; }
+        const join=a=>(a||[]).join("\n");
+        ui().formModal({title:"🤖 自动复盘 · "+draft.weekLabel,size:"lg",fields:[
+          {name:"week",label:"周区间",type:"text",value:draft.weekLabel,required:true},
+          {name:"done",label:"本周完成事项（每行一条）",type:"textarea",value:join(draft.done)},
+          {name:"undone",label:"本周未完成事项",type:"textarea",value:join(draft.undone)},
+          {name:"problem",label:"本周问题总结 & 改进建议",type:"textarea",value:draft.problem},
+          {name:"plan",label:"下周改进计划",type:"textarea",value:join(draft.plan)},
+          {name:"goal",label:"下周目标",type:"textarea",value:join(draft.goal)}],
+          onSubmit:v=>{ const sp=x=>x.split("\n").map(z=>z.trim()).filter(Boolean);
+            M().addReview({week:v.week,done:sp(v.done),undone:sp(v.undone),problem:v.problem,plan:sp(v.plan),goal:sp(v.goal)});
+            App.refresh(); ui().toast("✅ 自动复盘已保存，可继续编辑完善"); }}); },
       "rv-add":()=>ui().formModal({title:"新增周复盘",fields:[
         {name:"week",label:"周区间（如 2026-07-28 ~ 2026-08-03）",type:"text",required:true}],
         onSubmit:v=>{ M().addReview(v); App.refresh(); ui().toast("已创建，去填写吧"); }}),
