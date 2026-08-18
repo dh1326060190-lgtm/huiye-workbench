@@ -3085,6 +3085,7 @@ const S = ()=>(App.store&&App.store.state)||{};
 
   App.refresh = function(){
     const el = document.getElementById("content");
+    if(App._lastPage){ (App._memo=App._memo||{})[App._lastPage] = (el.scrollTop||0); }
     const key = S().currentPage;
     const page = App.pages[key] || App.pages.today;
     if(!page){ el.innerHTML='<p style="padding:20px">页面未找到: '+App.esc(key)+'</p>'; return; }
@@ -3092,6 +3093,8 @@ const S = ()=>(App.store&&App.store.state)||{};
     renderNav();
     renderBottombar();
     renderTopbar();
+    if(App._memo && App._memo[key]) el.scrollTop = App._memo[key];
+    App._lastPage = key;
   };
 
   App.startReminders=function(){
