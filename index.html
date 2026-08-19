@@ -474,19 +474,26 @@ a{color:inherit;text-decoration:none;}
     else window.addEventListener('DOMContentLoaded',function(){document.body.appendChild(d);});
   };
   window.onerror=function(msg,url,line,col,err){
-    const isScriptError=msg==='Script error.'||(!url&&msg&&/Script error/i.test(msg));
-    if(window.App&&App._ocrActive&&isScriptError){
-      if(typeof App._ocrOnScriptError==='function') App._ocrOnScriptError(msg,url);
-      return true;
-    }
-    show('页面运行出错:\n'+msg+'\n at '+(url||'')+':'+(line||'?')+(col?':'+col:'')+'\n'+(err&&err.stack||'')); return true;
+    try{
+      const isScriptError=String(msg)==='Script error.'||(!url&&msg&&/Script error/i.test(String(msg)));
+      const A=window.App;
+      if(A&&A._ocrActive&&isScriptError){
+        if(typeof A._ocrOnScriptError==='function') A._ocrOnScriptError(String(msg),url);
+        return true;
+      }
+      show('页面运行出错:\n'+String(msg)+'\n at '+(url||'')+':'+(line||'?')+(col?':'+col:'')+'\n'+(err&&err.stack||''));
+    }catch(_e){ /* onerror 自身绝不能抛错 */ }
+    return true;
   };
   window.addEventListener('unhandledrejection',function(e){
-    if(window.App&&App._ocrActive&&e.reason&&/Script error|worker|tesseract/i.test(String(e.reason))){
-      if(typeof App._ocrOnScriptError==='function') App._ocrOnScriptError(String(e.reason));
-      e.preventDefault(); return;
-    }
-    show('未处理的 Promise 异常:\n'+(e.reason&&e.reason.stack||e.reason));
+    try{
+      const A=window.App;
+      if(A&&A._ocrActive&&e.reason&&/Script error|worker|tesseract/i.test(String(e.reason))){
+        if(typeof A._ocrOnScriptError==='function') A._ocrOnScriptError(String(e.reason));
+        e.preventDefault(); return;
+      }
+      show('未处理的 Promise 异常:\n'+(e.reason&&e.reason.stack||e.reason));
+    }catch(_e){}
   });
 })();
 </script>
