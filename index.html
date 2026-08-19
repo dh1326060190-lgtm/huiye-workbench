@@ -750,6 +750,7 @@ a{color:inherit;text-decoration:none;}
       {id:"sv1",platform:"抖音",title:"毛坯房验收 9 个必查点",link:"https://v.douyin.com/example1",publishDate:"2026-07-22",play:125000,like:8600,comment:540,fav:3200,share:1100,finish:42,tag:"验房",note:"开头用「花几十万买房」制造焦虑钩子，完播拉满；结尾引导关注下期。"},
       {id:"sv2",platform:"小红书",title:"备婚收纳 30 个好物",link:"https://www.xiaohongshu.com/example2",publishDate:"2026-07-25",play:38000,like:2100,comment:80,fav:1500,share:120,finish:18,tag:"备婚",note:"收藏还行但完播掉得厉害，中段铺垫太长。"},
       {id:"sv3",platform:"视频号",title:"本地婚礼跟拍避坑",link:"https://weixin.qq.com/example3",publishDate:"2026-07-28",play:9600,like:720,comment:210,fav:300,share:95,finish:35,tag:"本地生活",note:"评论率异常高，话题性强，适合做系列。"},
+      {id:"sv4",platform:"小红书",form:"图文",title:"装修避坑 9 张清单图",link:"https://www.xiaohongshu.com/example4",publishDate:"2026-07-26",play:52000,like:3100,comment:140,fav:2600,share:200,finish:0,swipe:22,expand:38,tag:"验房",note:"图文收藏率高，划走率控制好；文案展开率尚可，首图可再强悬念。"},
     ],
     // 11. 素材图库
     materials:[
@@ -1144,7 +1145,9 @@ a{color:inherit;text-decoration:none;}
       const total=arr.length;
       const totalPlay=arr.reduce((s,x)=>s+x.play,0);
       const videos=arr.filter(x=>(x.form||"视频")!=="图文");
+      const images=arr.filter(x=>(x.form||"视频")==="图文");
       const avgFinish=videos.length?Math.round(videos.reduce((s,x)=>s+x.finish,0)/videos.length):0;
+      const avgSwipe=images.length?Math.round(images.reduce((s,x)=>s+(x.swipe||0),0)/images.length):0;
       const eng=arr.reduce((s,x)=>s+(x.like+x.comment+x.fav+x.share),0);
       const avgEng=totalPlay?+(eng/totalPlay*100).toFixed(2):0;
       const byPlat={};
@@ -1152,7 +1155,7 @@ a{color:inherit;text-decoration:none;}
       let bestPlat="-",bestAvg=-1;
       for(const p in byPlat){ const a=byPlat[p].play/byPlat[p].n; if(a>bestAvg){bestAvg=a;bestPlat=p;} }
       const top=arr.slice().sort((a,b)=>b.play-a.play)[0];
-      return {total,totalPlay,avgFinish,hasVideo:videos.length>0,avgEng,bestPlat,bestAvg:Math.round(bestAvg),top};
+      return {total,totalPlay,avgFinish,hasVideo:videos.length>0,avgSwipe,hasImage:images.length>0,avgEng,bestPlat,bestAvg:Math.round(bestAvg),top};
     },
     // 短视频复盘：单条健康度诊断（视频：完播/点赞/评论/收藏/转发；图文：点赞/评论/收藏/转发 + 图文专属）
     svDiagnose(e){
@@ -1175,6 +1178,10 @@ a{color:inherit;text-decoration:none;}
         else if(fr<5) out.push({lv:"warn",t:"收藏率 "+fr+"% 正常，可强化「评论区领 checklist / 建议收藏备查」。"});
         else out.push({lv:"good",t:"收藏率 "+fr+"% 优秀，实用性强，图文核心指标达标！"});
         out.push({lv:"warn",t:"图文建议：第 1 张图决定点击，放信息量最高 / 最有悬念的图；图片加箭头圈注引导视线；结尾图放「收藏理由」（如『建议收藏备查』）；话题标签组合 3-5 个覆盖搜索词。"});
+        const sw=e.swipe||0;
+        out.push({lv: sw<=30?"good":sw<=50?"warn":"bad", t:"划走率 "+sw+"%："+(sw<=30?"用户愿意往下翻，首图与标题钩子到位。":sw<=50?"中游，首图信息量或悬念可再强化，降低前几屏的无效铺垫。":"偏高，用户快速划走——首图没抓住注意力，重做封面与第 1 行文案。")});
+        const ex=e.expand||0;
+        out.push({lv: ex>=30?"good":ex>=15?"warn":"bad", t:"文案展开率 "+ex+"%："+(ex>=30?"「展开全文」比例高，正文有料，适合在正文埋钩子引导关注。":ex>=15?"一般，正文前 2 行需更抓人，尽早给利益点。":"偏低，正文开头没留住人，前 2 行要有强利益点 / 反差。")});
       } else {
         if(fr<1) out.push({lv:"bad",t:"收藏率 "+fr+"% 偏低：缺实用干货。加清单/模板/步骤图，提升「先藏再说」。"});
         else if(fr<3) out.push({lv:"warn",t:"收藏率 "+fr+"% 正常，可强化「评论区领 checklist」。"});
@@ -1204,7 +1211,10 @@ a{color:inherit;text-decoration:none;}
       const finRaw=months.map(m=>{ const t=map[m].filter(x=>(x.form||"视频")!=="图文"); return t.length?Math.round(t.reduce((s,x)=>s+x.finish,0)/t.length):null; });
       const hasFin=finRaw.some(x=>x!=null);
       let last=0; const fin=finRaw.map(x=>{ if(x==null)return last; last=x; return x; });
-      return {months,play,eng,fin,hasFin};
+      const swRaw=months.map(m=>{ const t=map[m].filter(x=>(x.form||"视频")==="图文"); return t.length?Math.round(t.reduce((s,x)=>s+(x.swipe||0),0)/t.length):null; });
+      const hasSwipe=swRaw.some(x=>x!=null);
+      let lastS=0; const swipe=swRaw.map(x=>{ if(x==null)return lastS; lastS=x; return x; });
+      return {months,play,eng,fin,hasFin,swipe,hasSwipe};
     },
     // 数据复盘：平台健康分（综合播放/互动/完播/收藏，满分 100）
     svHealth(){
@@ -1218,14 +1228,17 @@ a{color:inherit;text-decoration:none;}
         const avgPlay=Math.round(plays/(t.length||1));
         const eng=plays?+(t.reduce((s,x)=>s+x.like+x.comment+x.fav+x.share,0)/plays*100).toFixed(2):0;
         const vids=t.filter(x=>(x.form||"视频")!=="图文");
+        const imgs=t.filter(x=>(x.form||"视频")==="图文");
         const fin=vids.length?Math.round(vids.reduce((s,x)=>s+x.finish,0)/vids.length):null;
+        const swipe=imgs.length?Math.round(imgs.reduce((s,x)=>s+(x.swipe||0),0)/imgs.length):null;
+        const ret=fin!=null?fin:(swipe!=null?Math.max(0,100-swipe):null);
         const favRate=plays?+(t.reduce((s,x)=>s+x.fav,0)/plays*100).toFixed(2):0;
         const sPlay=Math.min(100,Math.round(Math.log10(avgPlay+10)/Math.log10(200010)*100));
         const sEng=Math.min(100,Math.round(eng/15*100));
-        const sFin=fin==null?0:Math.min(100,Math.round(fin/50*100));
+        const sFin=ret==null?0:Math.min(100,Math.round(ret/50*100));
         const sFav=Math.min(100,Math.round(favRate/10*100));
         const score=Math.round(sPlay*0.25+sEng*0.3+sFin*0.25+sFav*0.2);
-        return {platform:p,score,avgPlay,eng,fin,favRate,n:t.length};
+        return {platform:p,score,avgPlay,eng,fin,swipe,favRate,n:t.length};
       }).sort((a,b)=>b.score-a.score);
       const overall=Math.round(rows.reduce((s,x)=>s+x.score,0)/rows.length);
       return {rows,overall};
@@ -1767,11 +1780,11 @@ a{color:inherit;text-decoration:none;}
     addSvReview(v){
       store.state.svreviews.unshift({id:store.uid("sv"),platform:v.platform||"抖音",form:v.form||"视频",title:v.title,link:v.link||"",
         publishDate:v.publishDate||App.TODAY,play:+v.play||0,like:+v.like||0,comment:+v.comment||0,
-        fav:+v.fav||0,share:+v.share||0,finish:+v.finish||0,tag:v.tag||"",note:v.note||""}); save();
+        fav:+v.fav||0,share:+v.share||0,finish:+v.finish||0,swipe:+v.swipe||0,expand:+v.expand||0,tag:v.tag||"",note:v.note||""}); save();
     },
     updateSvReview(id,v){ const x=store.state.svreviews.find(z=>z.id===id); if(x)Object.assign(x,{
       platform:v.platform,form:v.form,title:v.title,link:v.link||"",publishDate:v.publishDate,play:+v.play||0,like:+v.like||0,
-      comment:+v.comment||0,fav:+v.fav||0,share:+v.share||0,finish:+v.finish||0,tag:v.tag||"",note:v.note||""}); save(); },
+      comment:+v.comment||0,fav:+v.fav||0,share:+v.share||0,finish:+v.finish||0,swipe:+v.swipe||0,expand:+v.expand||0,tag:v.tag||"",note:v.note||""}); save(); },
     deleteSvReview(id){ store.state.svreviews=store.state.svreviews.filter(z=>z.id!==id); save(); },
 
     // ---- 素材图库 ----
@@ -2879,8 +2892,12 @@ a{color:inherit;text-decoration:none;}
     const s=S(), arr=s.svreviews||[], ov=App.calc.svOverview();
     const trend=App.calc.svTrend(), health=App.calc.svHealth();
     const dna=arr.filter(x=>{ const eng=(x.like+x.comment+x.fav+x.share)/(x.play||1)*100; const fin=(x.form||"视频")!=="图文"?x.finish:null; return (fin!=null&&fin>=35)||eng>=8; });
-    const dnaAvgFin=(()=>{ const v=dna.filter(x=>(x.form||"视频")!=="图文"); return v.length?Math.round(v.reduce((s,x)=>s+x.finish,0)/v.length):0; })();
+    const dnaVids=dna.filter(x=>(x.form||"视频")!=="图文");
+    const dnaImgs=dna.filter(x=>(x.form||"视频")==="图文");
+    const dnaAvgFin=dnaVids.length?Math.round(dnaVids.reduce((s,x)=>s+x.finish,0)/dnaVids.length):0;
+    const dnaAvgSwipe=dnaImgs.length?Math.round(dnaImgs.reduce((s,x)=>s+(x.swipe||0),0)/dnaImgs.length):0;
     const dnaAvgEng=dna.length?+(dna.reduce((s,x)=>s+(x.like+x.comment+x.fav+x.share)/(x.play||1)*100,0)/dna.length).toFixed(1):0;
+    const dnaCoreLabel=dnaVids.length?"平均完播 "+dnaAvgFin+"%":"平均划走 "+dnaAvgSwipe+"%";
     const rows=arr.map(v=>{
       const diag=App.calc.svDiagnose(v);
       const diagHtml=diag.map(d=>`<span class="sv-flag sv-${d.lv}">${d.lv==="good"?"✓":d.lv==="warn"?"!":"✕"} ${App.esc(d.t)}</span>`).join("");
@@ -2891,7 +2908,10 @@ a{color:inherit;text-decoration:none;}
         <div class="card-body">
           <div class="sv-meta">📅 ${App.esc(v.publishDate)} ｜ ${ui().catTag(v.tag||"未分类")} ｜ ${linkHtml}</div>
           <div class="sv-stats">
-            ${svStat(v.form==="图文"?"浏览":"播放",v.play)} ${svStat("点赞",v.like)} ${svStat("评论",v.comment)} ${svStat("收藏",v.fav)} ${svStat("转发",v.share)} ${v.form==="图文"?svStat("完播","—"):svStat("完播",v.finish+"%")}
+            ${svStat(v.form==="图文"?"浏览":"播放",v.play)} ${svStat("点赞",v.like)} ${svStat("评论",v.comment)} ${svStat("收藏",v.fav)} ${svStat("转发",v.share)}
+            ${v.form==="图文"
+              ? svStat("划走率",(v.swipe||0)+"%")+svStat("文案展开率",(v.expand||0)+"%")
+              : svStat("完播率",v.finish+"%")}
           </div>
           ${diagHtml?`<div class="sv-diag">${diagHtml}</div>`:""}
           ${v.note?`<div class="sv-note">📝 ${App.esc(v.note)}</div>`:""}
@@ -2903,7 +2923,7 @@ a{color:inherit;text-decoration:none;}
       <div class="stat-grid">
         ${ui().statCard({label:"发布作品",icon:"🎬",value:ov.total,unit:"条"})}
         ${ui().statCard({label:"总播放",icon:"▶️",value:ov.totalPlay.toLocaleString(),unit:"次"})}
-        ${ui().statCard({label:"平均完播率",icon:"⏱️",value:ov.hasVideo?ov.avgFinish:"—",unit:ov.hasVideo?"%":"",accent:true})}
+        ${ui().statCard({label:ov.hasVideo?"平均完播率":(ov.hasImage?"平均划走率":"平均完播率"),icon:"⏱️",value:ov.hasVideo?ov.avgFinish:(ov.hasImage?ov.avgSwipe:"—"),unit:(ov.hasVideo||ov.hasImage)?"%":"",accent:true})}
         ${ui().statCard({label:"平均互动率",icon:"💬",value:ov.avgEng,unit:"%"})}
       </div>
       ${ov.bestPlat!=="-"?`<div class="sv-best">🏆 表现最佳平台：<b>${App.esc(ov.bestPlat)}</b>（场均播放 ${ov.bestAvg.toLocaleString()}）${ov.top?` ｜ 爆款：<b>${App.esc(ov.top.title)}</b>（${ov.top.play.toLocaleString()} 播放）`:""}</div>`:""}
@@ -2912,6 +2932,7 @@ a{color:inherit;text-decoration:none;}
           <div class="sv-tr"><span class="sv-trk">总播放量</span>${ui().lineChart(trend.play,"#2d6a4f")}</div>
           <div class="sv-tr"><span class="sv-trk">平均互动率(%)</span>${ui().lineChart(trend.eng,"#e8920c")}</div>
           ${trend.hasFin?`<div class="sv-tr"><span class="sv-trk">平均完播率(%)</span>${ui().lineChart(trend.fin,"#2f6fed")}</div>`:""}
+          ${trend.hasSwipe?`<div class="sv-tr"><span class="sv-trk">平均划走率(%) · 图文</span>${ui().lineChart(trend.swipe,"#e8590c")}</div>`:""}
           <div class="sv-months">${trend.months.map(m=>`<span>${App.esc(m)}</span>`).join("")}</div>
         </div></div>`:""}
       ${health?`<div class="card"><div class="card-head"><h3>🩺 平台健康分</h3><span class="sub">综合播放/互动/完播/收藏 · 满分100</span></div>
@@ -2920,7 +2941,7 @@ a{color:inherit;text-decoration:none;}
           ${health.rows.map(r=>`<div class="sv-hrow">
             <span class="sv-hname">${App.esc(r.platform)}</span>
             <div class="progress-row"><div class="progress thin" style="flex:1"><i style="width:${r.score}%;background:${r.score>=70?'var(--green-600)':r.score>=45?'var(--green-500)':'var(--danger)'}"></i></div><span class="pct">${r.score}</span></div>
-            <span class="sv-hmeta">${r.n}条 · 互动${r.eng}%${r.fin!=null?` · 完播${r.fin}%`:''} · 收藏${r.favRate}%</span>
+            <span class="sv-hmeta">${r.n}条 · 互动${r.eng}%${r.fin!=null?` · 完播${r.fin}%`:(r.swipe!=null?` · 划走${r.swipe}%`:'')} · 收藏${r.favRate}%</span>
           </div>`).join("")}
         </div></div>`:""}
       <div class="card"><div class="card-head"><h3>发布记录（${arr.length}）</h3><span class="sub">填完数据自动给出专业诊断</span></div>
@@ -2932,7 +2953,7 @@ a{color:inherit;text-decoration:none;}
           const fr=+(d.fav/(d.play||1)*100).toFixed(2);
           return `<div class="row" data-search="${App.esc(d.title)}">
             <div class="main"><div class="title">${App.esc(d.platform)} · ${App.esc(d.title)} ${d.form==="图文"?'<span class="tag">图文</span>':''}</div>
-            <div class="meta"><span>完播 ${fin!=null?fin+'%':'—'}</span><span>互动 ${eng}%</span><span>收藏 ${fr}%</span></div>
+            <div class="meta">${fin!=null?`<span>完播 ${fin}%</span>`:`<span>划走 ${(d.swipe||0)}%</span><span>展开 ${(d.expand||0)}%</span>`}<span>互动 ${eng}%</span><span>收藏 ${fr}%</span></div>
             ${d.dnaNote?`<div class="meta" style="color:var(--green-700)">🧬 ${App.esc(d.dnaNote)}</div>`:''}</div>
             <div class="ops"><button class="link" data-action="sv-dna" data-id="${d.id}">${d.dnaNote?'拆解笔记':'写拆解'}</button></div></div>`;
         }).join("")}</div></div></div>`:""}
@@ -2959,15 +2980,18 @@ a{color:inherit;text-decoration:none;}
       {name:"comment",label:"评论",type:"number"},
       {name:"fav",label:"收藏",type:"number"},
       {name:"share",label:"转发",type:"number"},
-      {name:"finish",label:"完播率（%）",type:"number"},
+      {name:"finish",label:"完播率（%）",type:"number",hint:"仅视频"},
+      {name:"swipe",label:"划走率（%）",type:"number",hint:"仅图文"},
+      {name:"expand",label:"文案展开率（%）",type:"number",hint:"仅图文"},
       {name:"tag",label:"选题标签 / 赛道",type:"text",placeholder:"验房 / 备婚 / 本地生活"},
       {name:"note",label:"复盘笔记 / 我的建议",type:"textarea"},
     ],onChange:(formEl)=>{
       const fv=(formEl.querySelector('[name=form]')||{}).value;
-      const finishGrp=formEl.querySelector('[name=finish]'); const fg=finishGrp?finishGrp.closest('.grp'):null;
-      const playGrp=formEl.querySelector('[name=play]'); const pl=playGrp?playGrp.closest('.grp').querySelector('label'):null;
-      if(fv==="图文"){ if(fg) fg.style.display="none"; if(pl) pl.innerHTML='浏览/阅读量'; }
-      else { if(fg) fg.style.display=""; if(pl) pl.innerHTML='播放量'; }
+      const grp=n=>{ const e=formEl.querySelector('[name='+n+']'); return e?e.closest('.grp'):null; };
+      const isImg=fv==="图文";
+      ['finish'].forEach(n=>{ const g=grp(n); if(g)g.style.display=isImg?"none":""; });
+      ['swipe','expand'].forEach(n=>{ const g=grp(n); if(g)g.style.display=isImg?"":"none"; });
+      const pl=grp('play'); const plL=pl?pl.querySelector('label'):null; if(plL) plL.innerHTML=isImg?'浏览/阅读量':'播放量';
     },onSubmit:(f,close)=>{ if(v) M().updateSvReview(v.id,f); else M().addSvReview(f); close(); App.refresh(); ui().toast(v?"已保存":"已添加发布记录"); }});
   }
 
