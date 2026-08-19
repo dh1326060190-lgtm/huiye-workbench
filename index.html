@@ -473,8 +473,21 @@ a{color:inherit;text-decoration:none;}
     if(document.body) document.body.appendChild(d);
     else window.addEventListener('DOMContentLoaded',function(){document.body.appendChild(d);});
   };
-  window.onerror=function(msg,url,line,col,err){ show('页面运行出错:\n'+msg+'\n at '+(url||'')+':'+(line||'?')+(col?':'+col:'')+'\n'+(err&&err.stack||'')); return true; };
-  window.addEventListener('unhandledrejection',function(e){ show('未处理的 Promise 异常:\n'+(e.reason&&e.reason.stack||e.reason)); });
+  window.onerror=function(msg,url,line,col,err){
+    const isScriptError=msg==='Script error.'||(!url&&msg&&/Script error/i.test(msg));
+    if(window.App&&App._ocrActive&&isScriptError){
+      if(typeof App._ocrOnScriptError==='function') App._ocrOnScriptError(msg,url);
+      return true;
+    }
+    show('页面运行出错:\n'+msg+'\n at '+(url||'')+':'+(line||'?')+(col?':'+col:'')+'\n'+(err&&err.stack||'')); return true;
+  };
+  window.addEventListener('unhandledrejection',function(e){
+    if(window.App&&App._ocrActive&&e.reason&&/Script error|worker|tesseract/i.test(String(e.reason))){
+      if(typeof App._ocrOnScriptError==='function') App._ocrOnScriptError(String(e.reason));
+      e.preventDefault(); return;
+    }
+    show('未处理的 Promise 异常:\n'+(e.reason&&e.reason.stack||e.reason));
+  });
 })();
 </script>
 <style>
@@ -3121,7 +3134,26 @@ a{color:inherit;text-decoration:none;}
     const formEl=document.getElementById('ocrForm');
     const fillBtn=document.getElementById('ocrFill');
     let metrics={};
-    const close=()=>{ root.innerHTML=''; document.removeEventListener('keydown',onKey); document.removeEventListener('paste',onPaste); };
+    function showOcrFallback(reason){
+      if(!statusEl) return;
+      statusEl.innerHTML=reason+'<br><a href="#" id="ocrRetry" style="color:var(--primary);text-decoration:underline">重试</a> 或 <a href="#" id="ocrManual" style="color:var(--primary);text-decoration:underline">手动填写</a>';
+      const retry=document.getElementById('ocrRetry');
+      const manual=document.getElementById('ocrManual');
+      if(retry) retry.addEventListener('click',e=>{ e.preventDefault(); startRecognize(imgEl.src); });
+      if(manual) manual.addEventListener('click',e=>{ e.preventDefault(); close(); svForm({}); });
+    }
+    App._ocrActive=true;
+    App._ocrOnScriptError=(msg,url)=>{
+      console.warn('OCR script error intercepted',msg,url);
+      if(statusEl) showOcrFallback('识别引擎初始化失败（跨域脚本被浏览器拦截）');
+    };
+    const close=()=>{
+      root.innerHTML='';
+      App._ocrActive=false;
+      App._ocrOnScriptError=null;
+      document.removeEventListener('keydown',onKey);
+      document.removeEventListener('paste',onPaste);
+    };
     const onKey=(e)=>{ if(e.key==='Escape') close(); };
     document.addEventListener('keydown',onKey);
     mask.addEventListener('click',e=>{ if(e.target===mask||e.target.hasAttribute('data-close')) close(); });
@@ -3174,16 +3206,11 @@ a{color:inherit;text-decoration:none;}
       }).catch(err=>{
         if(worker){ try{ worker.terminate(); }catch(e){} worker=null; }
         const msg=(err&&err.message)||'未知错误';
-        statusEl.textContent='识别失败：'+msg;
         console.error('OCR error',err);
-        // 跨域脚本出错时浏览器会隐藏成 Script error，提供降级入口
         if(msg==='Script error.'||/Script error|worker|wasm/i.test(msg)){
-          statusEl.innerHTML='识别引擎初始化失败（手机浏览器限制/网络原因）。<br><a href="#" id="ocrRetry" style="color:var(--primary);text-decoration:underline">重试</a> 或 <a href="#" id="ocrManual" style="color:var(--primary);text-decoration:underline">手动填写</a>';
-          const retry=document.getElementById('ocrRetry');
-          const manual=document.getElementById('ocrManual');
-          if(retry) retry.addEventListener('click',e=>{ e.preventDefault(); startRecognize(dataUrl); });
-          if(manual){ manual.addEventListener('click',e=>{ e.preventDefault(); close(); svForm({}); }); }
+          showOcrFallback('识别引擎初始化失败（手机浏览器限制/网络原因）');
         }else{
+          if(statusEl) statusEl.textContent='识别失败：'+msg;
           ui().toast('OCR 识别失败：'+msg,'err');
         }
       });
