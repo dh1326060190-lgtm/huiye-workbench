@@ -394,6 +394,22 @@ a{color:inherit;text-decoration:none;}
 .sv-note{font-size:13px;color:var(--text-2);background:var(--surface-2);border-radius:8px;padding:8px 10px;border:1px solid var(--border-2)}
 .sv-card .card-head h3{font-size:14.5px}
 
+/* ---------- 截图识别数据 ---------- */
+.ocr-drop{border:2px dashed var(--green-300);background:var(--green-050);border-radius:14px;padding:28px 20px;text-align:center;transition:.15s;cursor:pointer}
+.ocr-drop.active{border-color:var(--green-600);background:var(--green-100)}
+.ocr-drop-inner{display:flex;flex-direction:column;align-items:center;gap:8px}
+.ocr-drop .ocr-icon{font-size:42px;line-height:1}
+.ocr-drop p{font-size:14px;color:var(--text)}
+.ocr-drop .sub{font-size:12px;color:var(--text-3)}
+.ocr-preview{text-align:center;margin-bottom:16px}
+.ocr-preview img{max-width:100%;max-height:220px;border-radius:12px;box-shadow:var(--shadow)}
+.ocr-status{font-size:12.5px;color:var(--text-2);margin-top:10px;background:var(--surface-2);border-radius:8px;padding:8px 12px;display:inline-block}
+.ocr-fields .form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ocr-fields .form .grp:nth-child(3),.ocr-fields .form .grp:nth-child(13){grid-column:1/-1}
+@media(max-width:768px){
+  .ocr-fields .form{grid-template-columns:1fr}
+}
+
 /* 素材预览弹窗 */
 .prev-img{max-width:100%;max-height:68vh;border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.28)}
 .prev-ph{display:flex;justify-content:center;padding:8px 0}
@@ -2919,7 +2935,7 @@ a{color:inherit;text-decoration:none;}
     }).join("");
     el.innerHTML=`
       <div class="page-head"><div><h2>📊 数据复盘</h2><p>视频 / 图文数据复盘 · 自动诊断健康度</p></div>
-        <div class="head-actions">${ui().btn("＋ 新增发布记录","primary","sv-add")}</div></div>
+        <div class="head-actions">${ui().btn("📷 截图识别","","sv-ocr")}${ui().btn("＋ 新增发布记录","primary","sv-add")}</div></div>
       <div class="stat-grid">
         ${ui().statCard({label:"发布作品",icon:"🎬",value:ov.total,unit:"条"})}
         ${ui().statCard({label:"总播放",icon:"▶️",value:ov.totalPlay.toLocaleString(),unit:"次"})}
@@ -2960,6 +2976,7 @@ a{color:inherit;text-decoration:none;}
 `;
     App.bindActions(el,{
       "sv-add":()=>svForm(null),
+      "sv-ocr":()=>svOcr(),
       "sv-edit":e=>{ const v=s.svreviews.find(x=>x.id===e.currentTarget.dataset.id); svForm(v); },
       "sv-del":e=>{ const id=e.currentTarget.dataset.id; ui().confirm({text:"删除该发布记录？",onOk:()=>{ M().deleteSvReview(id); App.refresh(); ui().toast("已删除"); }}); },
       "sv-dna":e=>{ const v=s.svreviews.find(x=>x.id===e.currentTarget.dataset.id); ui().formModal({title:"🧬 爆款拆解笔记",value:v,fields:[
@@ -2969,7 +2986,8 @@ a{color:inherit;text-decoration:none;}
   }
   function svStat(label,val){ return `<div class="sv-stat"><div class="v">${typeof val==="number"?val.toLocaleString():val}</div><div class="l">${label}</div></div>`; }
   function svForm(v){
-    ui().formModal({title:v?"编辑发布记录":"新增发布记录",okText:v?"保存":"添加",value:v||{},fields:[
+    const isPrefill=!!v && !v.id;
+    ui().formModal({title:v && v.id?"编辑发布记录":"新增发布记录",okText:v && v.id?"保存":"添加",value:v||{},fields:[
       {name:"platform",label:"发布平台",type:"select",options:["抖音","小红书","视频号","B站","快手","微博","其他"]},
       {name:"form",label:"内容形式",type:"select",options:["视频","图文"]},
       {name:"title",label:"内容标题",type:"text",required:true},
@@ -2992,7 +3010,197 @@ a{color:inherit;text-decoration:none;}
       ['finish'].forEach(n=>{ const g=grp(n); if(g)g.style.display=isImg?"none":""; });
       ['swipe','expand'].forEach(n=>{ const g=grp(n); if(g)g.style.display=isImg?"":"none"; });
       const pl=grp('play'); const plL=pl?pl.querySelector('label'):null; if(plL) plL.innerHTML=isImg?'浏览/阅读量':'播放量';
-    },onSubmit:(f,close)=>{ if(v) M().updateSvReview(v.id,f); else M().addSvReview(f); close(); App.refresh(); ui().toast(v?"已保存":"已添加发布记录"); }});
+    },onSubmit:(f,close)=>{ if(v && v.id) M().updateSvReview(v.id,f); else M().addSvReview(f); close(); App.refresh(); ui().toast(v && v.id?"已保存":(isPrefill?"已识别并添加发布记录":"已添加发布记录")); }});
+  }
+
+  /* ---------- 截图识别数据（OCR） ---------- */
+  let _tesseractLoading=null;
+  function loadTesseract(){
+    if(window.Tesseract) return Promise.resolve(window.Tesseract);
+    if(_tesseractLoading) return _tesseractLoading;
+    _tesseractLoading=new Promise((resolve,reject)=>{
+      const s=document.createElement('script');
+      s.src='https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js';
+      s.onload=()=>resolve(window.Tesseract);
+      s.onerror=()=>reject(new Error('OCR 引擎加载失败，请检查网络'));
+      document.head.appendChild(s);
+    });
+    return _tesseractLoading;
+  }
+  function parseOcrNumber(str,allowUnit){
+    if(str==null) return null;
+    str=String(str).replace(/[,，]/g,'').trim();
+    if(allowUnit && /万/.test(str)){
+      const m=str.match(/[\d.]+/);
+      return m?Math.round(parseFloat(m[0])*10000):null;
+    }
+    const m=str.match(/[\d.]+/);
+    return m?parseFloat(m[0]):null;
+  }
+  function detectOcrPlatform(text){
+    if(/笔记分析|小红书|笔记数据|曝光数|封面点击率/.test(text)) return {platform:'小红书',form:'图文'};
+    if(/作品数据|抖音|DOU\+|创作者中心|完播率|划走率/.test(text)) return {platform:'抖音',form:/划走率|文案展开率|平均浏览图片数/.test(text)?'图文':'视频'};
+    if(/视频号/.test(text)) return {platform:'视频号',form:/完播率/.test(text)?'视频':'图文'};
+    if(/B站|bilibili|哔哩哔哩/.test(text)) return {platform:'B站',form:'视频'};
+    if(/快手/.test(text)) return {platform:'快手',form:'视频'};
+    if(/微博/.test(text)) return {platform:'微博',form:'图文'};
+    return {platform:'',form:'视频'};
+  }
+  function extractOcrMetrics(text){
+    const info=detectOcrPlatform(text);
+    const lines=text.split(/\n/).map(l=>l.trim()).filter(l=>l.length>0);
+    const metrics={platform:info.platform,form:info.form};
+    const patterns=[
+      {keys:['观看数','播放量','浏览量','阅读量','播放'], name:'play', unit:'number'},
+      {keys:['曝光数','曝光量','曝光'], name:'expose', unit:'number'},
+      {keys:['封面点击率','点击率'], name:'ctr', unit:'percent'},
+      {keys:['互动率'], name:'engRate', unit:'percent'},
+      {keys:['点赞数','点赞量','点赞'], name:'like', unit:'number'},
+      {keys:['评论数','评论量','评论'], name:'comment', unit:'number'},
+      {keys:['收藏数','收藏量','收藏'], name:'fav', unit:'number'},
+      {keys:['分享数','分享量','转发数','转发量','分享','转发'], name:'share', unit:'number'},
+      {keys:['完播率','完播'], name:'finish', unit:'percent'},
+      {keys:['划走率','划走'], name:'swipe', unit:'percent'},
+      {keys:['文案展开率','展开率','文案展开'], name:'expand', unit:'percent'},
+    ];
+    for(let i=0;i<lines.length;i++){
+      const line=lines[i];
+      for(const p of patterns){
+        const hit=p.keys.some(k=>line.includes(k));
+        if(!hit) continue;
+        let raw=line;
+        if(!/[\d.%万]/.test(raw) && i+1<lines.length) raw=lines[i+1];
+        const v=parseOcrNumber(raw,p.unit==='number');
+        if(v!==null) metrics[p.name]=v;
+      }
+    }
+    return metrics;
+  }
+  App.extractOcrMetrics=extractOcrMetrics;
+  function svOcr(){
+    const root=document.getElementById('modalRoot');
+    const todayD=new Date();
+    const todayStr=`${todayD.getFullYear()}-${String(todayD.getMonth()+1).padStart(2,'0')}-${String(todayD.getDate()).padStart(2,'0')}`;
+    root.innerHTML=`
+      <div class="modal-mask" id="ocrMask">
+        <div class="modal">
+          <div class="modal-head"><h3>📷 截图识别数据</h3><button class="x" data-close>×</button></div>
+          <div class="modal-body">
+            <div class="ocr-drop" id="ocrDrop">
+              <div class="ocr-drop-inner">
+                <div class="ocr-icon">📸</div>
+                <p>点击上传或 <b>Ctrl+V</b> 粘贴截图</p>
+                <span class="sub">支持小红书 / 抖音 数据详情页截图</span>
+                <input type="file" id="ocrFile" accept="image/*" style="display:none">
+                <button class="btn btn-primary" id="ocrPick">选择截图</button>
+              </div>
+            </div>
+            <div class="ocr-preview" id="ocrPreview" style="display:none">
+              <img id="ocrImg" src="" alt="preview">
+              <div class="ocr-status" id="ocrStatus">正在加载 OCR 引擎…</div>
+            </div>
+            <div class="ocr-fields" id="ocrFields" style="display:none">
+              <div class="section-title"><span class="bar"></span>识别结果（可手动修正）</div>
+              <div class="form" id="ocrForm"></div>
+            </div>
+          </div>
+          <div class="modal-foot">
+            <button class="btn btn-ghost" data-close>取消</button>
+            <button class="btn btn-primary" id="ocrFill" disabled>填入表单</button>
+          </div>
+        </div>
+      </div>`;
+    const mask=document.getElementById('ocrMask');
+    const drop=document.getElementById('ocrDrop');
+    const fileInp=document.getElementById('ocrFile');
+    const preview=document.getElementById('ocrPreview');
+    const imgEl=document.getElementById('ocrImg');
+    const statusEl=document.getElementById('ocrStatus');
+    const fieldsEl=document.getElementById('ocrFields');
+    const formEl=document.getElementById('ocrForm');
+    const fillBtn=document.getElementById('ocrFill');
+    let metrics={};
+    const close=()=>{ root.innerHTML=''; document.removeEventListener('keydown',onKey); document.removeEventListener('paste',onPaste); };
+    const onKey=(e)=>{ if(e.key==='Escape') close(); };
+    document.addEventListener('keydown',onKey);
+    mask.addEventListener('click',e=>{ if(e.target===mask||e.target.hasAttribute('data-close')) close(); });
+    const onPaste=(e)=>{ const items=e.clipboardData&&e.clipboardData.items; if(!items) return; for(let i=0;i<items.length;i++){ if(items[i].type.indexOf('image')!==-1){ const blob=items[i].getAsFile(); handleFile(blob); e.preventDefault(); break; } } };
+    document.addEventListener('paste',onPaste);
+    document.getElementById('ocrPick').addEventListener('click',()=>fileInp.click());
+    fileInp.addEventListener('change',()=>{ const f=fileInp.files&&fileInp.files[0]; if(f) handleFile(f); });
+    drop.addEventListener('dragover',e=>{ e.preventDefault(); drop.classList.add('active'); });
+    drop.addEventListener('dragleave',()=>drop.classList.remove('active'));
+    drop.addEventListener('drop',e=>{ e.preventDefault(); drop.classList.remove('active'); const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) handleFile(f); });
+    function handleFile(file){
+      if(!file || !file.type.startsWith('image/')){ ui().toast('请选择图片文件','err'); return; }
+      const reader=new FileReader();
+      reader.onload=()=>{ startRecognize(reader.result); };
+      reader.readAsDataURL(file);
+    }
+    function startRecognize(dataUrl){
+      drop.style.display='none';
+      preview.style.display='block';
+      imgEl.src=dataUrl;
+      statusEl.textContent='正在加载 OCR 引擎…';
+      loadTesseract().then(T=>{
+        statusEl.textContent='正在识别文字…';
+        return T.recognize(dataUrl,'chi_sim+eng',{logger:m=>{
+          if(m.status && statusEl) statusEl.textContent='正在识别：'+m.status+' '+(Math.round(m.progress*100)||0)+'%';
+        }});
+      }).then(result=>{
+        const text=result&&result.data&&result.data.text||'';
+        statusEl.textContent='识别完成';
+        metrics=extractOcrMetrics(text);
+        renderOcrFields(metrics,todayStr);
+        fieldsEl.style.display='block';
+        fillBtn.disabled=false;
+      }).catch(err=>{
+        statusEl.textContent='识别失败：'+(err&&err.message||'未知错误');
+        ui().toast('OCR 识别失败，请手动填写','err');
+        console.error(err);
+      });
+    }
+    function renderOcrFields(m,today){
+      const fields=[
+        {n:'platform',l:'发布平台',t:'select',opts:['抖音','小红书','视频号','B站','快手','微博','其他']},
+        {n:'form',l:'内容形式',t:'select',opts:['视频','图文']},
+        {n:'title',l:'内容标题',t:'text'},
+        {n:'publishDate',l:'发布时间',t:'date',v:today},
+        {n:'play',l:'播放量 / 浏览量',t:'number'},
+        {n:'like',l:'点赞',t:'number'},
+        {n:'comment',l:'评论',t:'number'},
+        {n:'fav',l:'收藏',t:'number'},
+        {n:'share',l:'转发',t:'number'},
+        {n:'finish',l:'完播率（%）',t:'number'},
+        {n:'swipe',l:'划走率（%）',t:'number'},
+        {n:'expand',l:'文案展开率（%）',t:'number'},
+        {n:'tag',l:'选题标签 / 赛道',t:'text'},
+      ];
+      formEl.innerHTML=fields.map(f=>{
+        const val=m[f.n]!=null?m[f.n]:(f.v||'');
+        if(f.t==='select'){
+          return `<div class="grp"><label>${f.l}</label><select name="${f.n}">${f.opts.map(o=>`<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}</select></div>`;
+        }
+        return `<div class="grp"><label>${f.l}</label><input type="${f.t}" name="${f.n}" value="${val}"></div>`;
+      }).join('');
+      const formSel=formEl.querySelector('[name=form]');
+      const toggle=()=>{
+        const isImg=formSel.value==='图文';
+        const hide=n=>{ const g=formEl.querySelector('[name='+n+']'); if(g) g.closest('.grp').style.display='none'; };
+        const show=n=>{ const g=formEl.querySelector('[name='+n+']'); if(g) g.closest('.grp').style.display=''; };
+        ['finish'].forEach(isImg?hide:show);
+        ['swipe','expand'].forEach(isImg?show:hide);
+      };
+      formSel.addEventListener('change',toggle);
+      toggle();
+    }
+    fillBtn.addEventListener('click',()=>{
+      const fd=new FormData(formEl);
+      const out={};
+      ['platform','form','title','publishDate','play','like','comment','fav','share','finish','swipe','expand','tag'].forEach(n=>out[n]=fd.get(n));
+      close();
+      svForm(out);
+    });
   }
 
   App.pages={
