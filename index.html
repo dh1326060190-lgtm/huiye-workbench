@@ -3186,20 +3186,21 @@ a{color:inherit;text-decoration:none;}
       if(!window.Worker){ showOcrFallback('当前浏览器不支持 Web Worker，无法运行 OCR'); return; }
       if(!window.WebAssembly){ showOcrFallback('当前浏览器不支持 WebAssembly，无法运行 OCR'); return; }
       const tessCDN='https://cdn.jsdelivr.net/npm';
+      const langVer='4.0.0_fast';
       let timeoutId=null;
       loadTesseract().then(T=>{
-        statusEl.textContent='正在加载识别模型（首次约 5-15 秒）…';
+        statusEl.textContent='正在加载识别模型（首次约 10-30 秒）…';
         timeoutId=setTimeout(()=>{
           if(statusEl && /加载|识别|初始化/i.test(statusEl.textContent||'')){
-            showOcrFallback('识别超时（手机浏览器限制/网络原因）');
+            showOcrFallback('识别超时（模型加载过慢/网络原因）');
           }
-        },25000);
+        },45000);
         return T.recognize(dataUrl,'chi_sim',{
           logger:m=>{
             if(m.status && statusEl) statusEl.textContent='正在识别：'+m.status+' '+(Math.round(m.progress*100)||0)+'%';
           },
           workerPath:tessCDN+'/tesseract.js@4/dist/worker.min.js',
-          langPath:tessCDN+'/@tesseract.js-data/chi_sim/4.0.0_best_int/',
+          langPath:tessCDN+'/@tesseract.js-data/chi_sim/'+langVer+'/',
           corePath:tessCDN+'/tesseract.js-core@4/tesseract-core.wasm.js'
         });
       }).then(result=>{
