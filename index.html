@@ -3142,12 +3142,25 @@ a{color:inherit;text-decoration:none;}
       preview.style.display='block';
       imgEl.src=dataUrl;
       statusEl.textContent='正在加载 OCR 引擎…';
+      let worker=null;
       loadTesseract().then(T=>{
+        statusEl.textContent='正在加载识别模型（首次约 5-15 秒）…';
+        return T.createWorker('chi_sim',1,{
+          logger:m=>{
+            if(m.status && statusEl) statusEl.textContent='正在识别：'+m.status+' '+(Math.round(m.progress*100)||0)+'%';
+          },
+          errorHandler:e=>{
+            console.error('tesseract error',e);
+            if(statusEl) statusEl.textContent='识别引擎报错：'+(e&&e.message||e);
+          },
+          langPath:'https://cdn.jsdelivr.net/npm/@tesseract.js-data/chi_sim/4.0.0_best_int/'
+        });
+      }).then(w=>{
+        worker=w;
         statusEl.textContent='正在识别文字…';
-        return T.recognize(dataUrl,'chi_sim+eng',{logger:m=>{
-          if(m.status && statusEl) statusEl.textContent='正在识别：'+m.status+' '+(Math.round(m.progress*100)||0)+'%';
-        }});
+        return worker.recognize(dataUrl);
       }).then(result=>{
+        if(worker) try{ worker.terminate(); }catch(e){}
         const text=result&&result.data&&result.data.text||'';
         statusEl.textContent='识别完成';
         metrics=extractOcrMetrics(text);
@@ -3155,6 +3168,7 @@ a{color:inherit;text-decoration:none;}
         fieldsEl.style.display='block';
         fillBtn.disabled=false;
       }).catch(err=>{
+        if(worker) try{ worker.terminate(); }catch(e){}
         statusEl.textContent='识别失败：'+(err&&err.message||'未知错误');
         ui().toast('OCR 识别失败，请手动填写','err');
         console.error(err);
