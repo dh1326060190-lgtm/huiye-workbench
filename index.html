@@ -3182,28 +3182,28 @@ a{color:inherit;text-decoration:none;}
       preview.style.display='block';
       imgEl.src=dataUrl;
       statusEl.textContent='正在加载 OCR 引擎…';
-      let worker=null;
+      // 环境预检
+      if(!window.Worker){ showOcrFallback('当前浏览器不支持 Web Worker，无法运行 OCR'); return; }
+      if(!window.WebAssembly){ showOcrFallback('当前浏览器不支持 WebAssembly，无法运行 OCR'); return; }
       const tessCDN='https://cdn.jsdelivr.net/npm';
+      let timeoutId=null;
       loadTesseract().then(T=>{
         statusEl.textContent='正在加载识别模型（首次约 5-15 秒）…';
-        return T.createWorker('chi_sim',1,{
+        timeoutId=setTimeout(()=>{
+          if(statusEl && /加载|识别|初始化/i.test(statusEl.textContent||'')){
+            showOcrFallback('识别超时（手机浏览器限制/网络原因）');
+          }
+        },25000);
+        return T.recognize(dataUrl,'chi_sim',{
           logger:m=>{
             if(m.status && statusEl) statusEl.textContent='正在识别：'+m.status+' '+(Math.round(m.progress*100)||0)+'%';
-          },
-          errorHandler:e=>{
-            console.error('tesseract error',e);
-            if(statusEl) statusEl.textContent='识别引擎报错：'+(e&&e.message||e);
           },
           workerPath:tessCDN+'/tesseract.js@4/dist/worker.min.js',
           langPath:tessCDN+'/@tesseract.js-data/chi_sim/4.0.0_best_int/',
           corePath:tessCDN+'/tesseract.js-core@4/tesseract-core.wasm.js'
         });
-      }).then(w=>{
-        worker=w;
-        statusEl.textContent='正在识别文字…';
-        return worker.recognize(dataUrl);
       }).then(result=>{
-        if(worker){ try{ worker.terminate(); }catch(e){} worker=null; }
+        clearTimeout(timeoutId);
         const text=result&&result.data&&result.data.text||'';
         statusEl.textContent='识别完成';
         metrics=extractOcrMetrics(text);
@@ -3211,14 +3211,18 @@ a{color:inherit;text-decoration:none;}
         fieldsEl.style.display='block';
         fillBtn.disabled=false;
       }).catch(err=>{
-        if(worker){ try{ worker.terminate(); }catch(e){} worker=null; }
-        const msg=(err&&err.message)||'未知错误';
-        console.error('OCR error',err);
-        if(msg==='Script error.'||/Script error|worker|wasm/i.test(msg)){
+        clearTimeout(timeoutId);
+        const raw=err&&err.stack?String(err.stack):(err&&err.message?String(err.message):(typeof err==='string'?err:JSON.stringify(err)));
+        const msg=String(raw||'未知错误').slice(0,200);
+        console.error('OCR error',err,raw);
+        if(/Script error|worker|wasm|createWorker|language|network|timeout|failed to fetch/i.test(msg)){
           showOcrFallback('识别引擎初始化失败（手机浏览器限制/网络原因）');
         }else{
-          if(statusEl) statusEl.textContent='识别失败：'+msg;
-          ui().toast('OCR 识别失败：'+msg,'err');
+          if(statusEl) statusEl.innerHTML='识别失败：'+msg.replace(/\n/g,'<br>')+'<br><a href="#" id="ocrRetry2" style="color:var(--primary);text-decoration:underline">重试</a> 或 <a href="#" id="ocrManual2" style="color:var(--primary);text-decoration:underline">手动填写</a>';
+          const r2=document.getElementById('ocrRetry2');
+          const m2=document.getElementById('ocrManual2');
+          if(r2) r2.addEventListener('click',e=>{ e.preventDefault(); startRecognize(dataUrl); });
+          if(m2) m2.addEventListener('click',e=>{ e.preventDefault(); close(); svForm({}); });
         }
       });
     }
