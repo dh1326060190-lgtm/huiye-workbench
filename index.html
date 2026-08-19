@@ -404,6 +404,10 @@ a{color:inherit;text-decoration:none;}
 .ocr-preview{text-align:center;margin-bottom:16px}
 .ocr-preview img{max-width:100%;max-height:220px;border-radius:12px;box-shadow:var(--shadow)}
 .ocr-status{font-size:12.5px;color:var(--text-2);margin-top:10px;background:var(--surface-2);border-radius:8px;padding:8px 12px;display:inline-block}
+.ocr-paste{margin-top:18px;padding-top:16px;border-top:1px dashed var(--border,#e5e7eb)}
+.ocr-paste .tip{font-size:12px;color:var(--text-3);margin:8px 0}
+.ocr-paste textarea{width:100%;min-height:104px;resize:vertical;border:1px solid var(--border,#e5e7eb);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.6;font-family:inherit;background:var(--surface-2,#f6f7f9);color:var(--text,#1f2329);box-sizing:border-box}
+.ocr-paste .btn{margin-top:10px}
 .ocr-fields .form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .ocr-fields .form .grp:nth-child(3),.ocr-fields .form .grp:nth-child(13){grid-column:1/-1}
 @media(max-width:768px){
@@ -3116,6 +3120,12 @@ a{color:inherit;text-decoration:none;}
                 <button class="btn btn-primary" id="ocrPick">选择截图</button>
               </div>
             </div>
+            <div class="ocr-paste">
+              <div class="section-title"><span class="bar"></span>或粘贴截图上的文字（免 OCR 引擎，手机可用）</div>
+              <p class="tip">手动把截图上的关键数字复制粘贴到下面，点「识别粘贴的文字」即可自动解析填表（无需下载模型）：</p>
+              <textarea id="ocrPaste" placeholder="例如：&#10;播放量 3.4万&#10;点赞量 42&#10;评论量 114&#10;收藏量 6&#10;划走率 29.92%&#10;文案展开率 0.06%"></textarea>
+              <button class="btn btn-ghost" id="ocrPasteBtn">识别粘贴的文字</button>
+            </div>
             <div class="ocr-preview" id="ocrPreview" style="display:none">
               <img id="ocrImg" src="" alt="preview">
               <div class="ocr-status" id="ocrStatus">正在加载 OCR 引擎…</div>
@@ -3267,6 +3277,17 @@ a{color:inherit;text-decoration:none;}
       ['platform','form','title','publishDate','play','like','comment','fav','share','finish','swipe','expand','tag'].forEach(n=>out[n]=fd.get(n));
       close();
       svForm(out);
+    });
+    const pasteArea=document.getElementById('ocrPaste');
+    const pasteBtn=document.getElementById('ocrPasteBtn');
+    if(pasteBtn) pasteBtn.addEventListener('click',()=>{
+      const txt=(pasteArea&&pasteArea.value||'').trim();
+      if(!txt){ ui().toast('请先粘贴截图上的文字','err'); return; }
+      metrics=extractOcrMetrics(txt);
+      if(statusEl) statusEl.textContent='已从粘贴文字解析';
+      renderOcrFields(metrics,todayStr);
+      fieldsEl.style.display='block';
+      fillBtn.disabled=false;
     });
   }
 
