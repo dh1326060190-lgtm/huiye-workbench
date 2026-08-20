@@ -3196,10 +3196,10 @@ a{color:inherit;text-decoration:none;}
       if(!window.Worker){ showOcrFallback('当前浏览器不支持 Web Worker，无法运行 OCR'); return; }
       if(!window.WebAssembly){ showOcrFallback('当前浏览器不支持 WebAssembly，无法运行 OCR'); return; }
       const tessCDN='https://cdn.jsdelivr.net/npm';
-      const langVer='4.0.0_fast';
+      const langVer='4.0.0_best_int';
       let timeoutId=null;
       loadTesseract().then(T=>{
-        statusEl.textContent='正在加载识别模型（首次约 10-30 秒）…';
+        statusEl.textContent='正在加载识别模型（首次约 10-20 秒）…';
         timeoutId=setTimeout(()=>{
           if(statusEl && /加载|识别|初始化/i.test(statusEl.textContent||'')){
             showOcrFallback('识别超时（模型加载过慢/网络原因）');
