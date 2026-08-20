@@ -2966,7 +2966,7 @@ a{color:inherit;text-decoration:none;}
 
   /* ---------------- 11.5 短视频复盘 ---------------- */
   function p_svreview(el){
-    const s=S(), arr=s.svreviews||[], ov=App.calc.svOverview();
+    const s=S(), arr=(s.svreviews||[]).slice().sort((a,b)=>(b.publishDate||"").localeCompare(a.publishDate||"")), ov=App.calc.svOverview();
     const trend=App.calc.svTrend(), health=App.calc.svHealth();
     const dna=arr.filter(x=>{ const eng=(x.like+x.comment+x.fav+x.share)/(x.play||1)*100; const fin=(x.form||"视频")!=="图文"?x.finish:null; return (fin!=null&&fin>=35)||eng>=8; });
     const dnaVids=dna.filter(x=>(x.form||"视频")!=="图文");
