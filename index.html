@@ -3272,9 +3272,11 @@ a{color:inherit;text-decoration:none;}
       toggle();
     }
     fillBtn.addEventListener('click',()=>{
-      const fd=new FormData(formEl);
       const out={};
-      ['platform','form','title','publishDate','play','like','comment','fav','share','finish','swipe','expand','tag'].forEach(n=>out[n]=fd.get(n));
+      ['platform','form','title','publishDate','play','like','comment','fav','share','finish','swipe','expand','tag'].forEach(n=>{
+        const el=formEl.querySelector('[name='+n+']');
+        out[n]=el?el.value:'';
+      });
       close();
       svForm(out);
     });
