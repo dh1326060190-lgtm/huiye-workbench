@@ -1123,7 +1123,7 @@ a{color:inherit;text-decoration:none;}
   function ts(s){ return Math.floor(parseD(s).getTime()/86400000); }
   App.todayNum = ts(App.TODAY);
   App.daysLeft = function(dateStr){ return ts(dateStr) - App.todayNum; };
-  App.fmtMoney = function(n){ return "¥" + Math.round(n).toLocaleString("zh-CN"); };
+  App.fmtMoney = function(n){ return "¥" + (Math.round((Number(n)||0)*100)/100).toLocaleString("zh-CN",{minimumFractionDigits:2,maximumFractionDigits:2}); };
 
   // ---------- derived computations (全部自动计算) ----------
   App.calc = {
