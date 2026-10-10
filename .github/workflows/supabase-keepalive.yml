@@ -1,0 +1,65 @@
+name: Supabase 保活 · 内销跟单同事投稿云端
+
+# ───────────────────────────────────────────────────────────────────────
+# 为什么需要它
+#   Supabase 免费项目「连续 7 天没有任何请求」会被自动暂停；暂停时项目域名会
+#   被一并摘掉，表现为工作台「同事投稿」与同事投稿页报 Failed to fetch。
+#   本任务每天访问一次项目 REST 接口，让项目始终保持活跃，不会被判定为闲置。
+#
+# 说明
+#   · 公开仓库的 Actions 不计费，每天一次不影响任何额度。
+#   · GitHub 会在仓库连续 60 天无提交时停用 schedule，因此本任务同时向
+#     keepalive 分支覆盖式写一个心跳提交（master 保持干净，不影响 Vercel 部署）。
+#   · 这里的 SUPABASE_ANON 是「设计上可公开」的 publishable key —— 同事投稿页
+#     前端本来就明文引用同一个 key，不涉及任何管理密钥。
+# ───────────────────────────────────────────────────────────────────────
+
+on:
+  schedule:
+    - cron: '0 3 * * *' # 每天 UTC 03:00（北京时间 11:00）
+  workflow_dispatch: # 也可在 Actions 页面手动 Run workflow 立即验证
+
+permissions:
+  contents: write
+
+concurrency:
+  group: supabase-keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_URL: https://unpqqqptkhdggfntxscy.supabase.co
+      SUPABASE_ANON: sb_publishable_ThPZiPRcvbvpyp_Ck13k6Q_zl6ABRlY
+    steps:
+      - name: 访问 Supabase REST 接口（保活）
+        run: |
+          set -euo pipefail
+          code=$(curl -s -o /tmp/resp.txt -w '%{http_code}' --max-time 25 \
+            -H "apikey: ${SUPABASE_ANON}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON}" \
+            "${SUPABASE_URL}/rest/v1/colleague_orders?select=id&limit=1")
+          echo "Supabase 响应 HTTP ${code}"
+          if [ "${code}" != "200" ]; then
+            echo "响应正文：$(head -c 300 /tmp/resp.txt || true)"
+            echo "::error::保活失败（HTTP ${code}）—— 项目可能已被暂停或网络异常，请登录 Supabase 后台检查"
+            exit 1
+          fi
+          echo "✅ 云端活跃，不会被暂停"
+
+      - name: 心跳提交（防止 GitHub 60 天后停用定时任务）
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git init -q -b keepalive .
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p keepalive
+          printf '最后保活：%s\nSupabase：HTTP 200\n' "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" > keepalive/heartbeat.txt
+          git add keepalive/heartbeat.txt
+          git commit -q -m "chore(keepalive): 内销跟单云端心跳 $(date -u '+%Y-%m-%d')"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push -f origin HEAD:refs/heads/keepalive
