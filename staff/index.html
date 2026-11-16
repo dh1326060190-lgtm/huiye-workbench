@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>同事版 · 内销跟单工作台</title>
+  <link rel="stylesheet" href="app.css?v=2" />
+</head>
+<body>
+  <!-- 防止用户直接双击本地文件打开导致 localStorage 隔离 -->
+  <script>
+    if (location.protocol === 'file:') {
+      document.write('<div style="padding:30px;font-family:Microsoft YaHei,sans-serif;max-width:700px;margin:50px auto;border:2px solid #d33;border-radius:10px;background:#fff5f5;color:#333;">');
+      document.write('<h2 style="color:#d33;margin-top:0">⚠️ 请通过浏览器访问工作台</h2>');
+      document.write('<p>你当前是以 <b>本地文件 (file://)</b> 方式打开，浏览器会把它当成一个独立站点，导致看不到任何数据。</p>');
+      document.write('<p>请在浏览器地址栏输入以下地址访问：</p>');
+      document.write('<p style="font-size:20px;font-weight:bold;background:#f0f0f0;padding:12px;border-radius:6px;"><a href="http://127.0.0.1:8800" style="color:#2f6df6;text-decoration:none">http://127.0.0.1:8800</a></p>');
+      document.write('<p>或者双击桌面的「内销跟单工作台」快捷方式。</p>');
+      document.write('</div>');
+      throw new Error('file-protocol-blocked');
+    }
+  </script>
+  <div id="app">
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">跟</div>
+        <div class="brand-text">
+          <strong>内销跟单工作台</strong>
+          <small>Order Tracking</small>
+        </div>
+      </div>
+      <nav id="nav">
+        <a href="#/dashboard" data-route="dashboard"><span class="ic">▦</span> 数据看板</a>
+        <a href="#/orders" data-route="orders"><span class="ic">📝</span> 订单管理</a>
+        <a href="#/production" data-route="production"><span class="ic">🏭</span> 生产跟进</a>
+        <a href="#/shipment" data-route="shipment"><span class="ic">🚚</span> 发货物流</a>
+        <a href="#/noship" data-route="noship"><span class="ic">📤</span> 无单出货</a>
+        <a href="#/customers" data-route="customers"><span class="ic">👥</span> 客户档案</a>
+        <a href="#/reconciliation" data-route="reconciliation"><span class="ic">💰</span> 对账回款</a>
+        <a href="#/exception" data-route="exception"><span class="ic">⚠️</span> 异常售后</a>
+        <a href="#/returns" data-route="returns"><span class="ic">↩️</span> 退货管理</a>
+        <a href="#/todo" data-route="todo"><span class="ic">✅</span> 待办中心</a>
+        <a href="#/reports" data-route="reports"><span class="ic">📊</span> 报表中心</a>
+        <a href="#/settings" data-route="settings"><span class="ic">⚙️</span> 设置</a>
+      </nav>
+      <div class="side-foot">本地存储 · 数据隐私安全<br /><a href="idb-diag.html" target="_blank" rel="noopener" style="color:#8ba0bd;text-decoration:none;font-size:11px">🧪 附件存储自检</a></div>
+    </aside>
+
+    <!-- 主区域 -->
+    <main class="main">
+      <header class="topbar">
+        <div class="page-title" id="pageTitle">数据看板</div>
+        <div class="top-search">
+          <input id="globalSearch" type="text" placeholder="🔍 全局搜索：订单号 / 客户 / 产品 / 手机号" />
+          <div id="searchResults" class="search-pop"></div>
+        </div>
+        <div class="top-actions">
+          <button id="bellBtn" class="bell" title="消息提醒">🔔<span id="bellDot" class="dot hidden"></span></button>
+        </div>
+      </header>
+      <section id="view" class="view"><!-- 各模块渲染到这里 --></section>
+    </main>
+  </div>
+
+  <!-- 模态框容器 -->
+  <div id="modalRoot"></div>
+  <!-- 轻提示容器 -->
+  <div id="toastRoot" class="toast-root"></div>
+
+  <script src="lib/xlsx.full.min.js"></script>
+  <script>window.__NXGD_STAFF__ = true;</script>
+  <script src="store.js?v=1"></script>
+  <script src="auth.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js?v=5"></script>
+  <script src="sync.js?v=1"></script>
+  <script src="app.js?v=8"></script>
+</body>
+</html>

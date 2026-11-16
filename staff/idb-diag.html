@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>附件存储自检 · 内销跟单工作台</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#fff; --line:#e3e8ef; --txt:#1f2937; --sub:#6b7280;
+    --ok:#0f9d58; --warn:#b5730f; --err:#d93025; --brand:#2f6df6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:24px;background:var(--bg);color:var(--txt);
+       font:14px/1.7 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  .wrap{max-width:820px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:var(--sub);margin:0 0 20px;font-size:13px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:14px}
+  .card h2{font-size:15px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+  .row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px dashed #eef1f5}
+  .row:last-child{border-bottom:0}
+  .k{color:var(--sub);flex:0 0 210px}
+  .v{flex:1;text-align:right;font-family:Consolas,Menlo,monospace;font-size:13px;word-break:break-all}
+  .tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;font-family:inherit}
+  .t-ok{background:#e6f4ea;color:var(--ok)}
+  .t-warn{background:#fdf3e0;color:var(--warn)}
+  .t-err{background:#fce8e6;color:var(--err)}
+  #verdict{padding:14px 18px;border-radius:10px;border:1px solid var(--line);background:var(--card);margin-bottom:14px}
+  #verdict .h{font-size:16px;font-weight:600;margin-bottom:6px}
+  #verdict.ok{border-left:4px solid var(--ok)}
+  #verdict.warn{border-left:4px solid var(--warn)}
+  #verdict.err{border-left:4px solid var(--err)}
+  ol{margin:8px 0 0;padding-left:20px}
+  li{margin:4px 0}
+  button{background:var(--brand);color:#fff;border:0;border-radius:6px;padding:8px 16px;font-size:14px;cursor:pointer}
+  button:hover{filter:brightness(.95)}
+  .hint{color:var(--sub);font-size:12px;margin-top:10px}
+  code{background:#f1f3f6;padding:1px 5px;border-radius:4px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>附件存储自检</h1>
+  <p class="sub">用来查清「截图存不下来 / 提示 IndexedDB 不可用」到底卡在哪一步。本页只读检测，不改动你的业务数据。</p>
+
+  <div id="verdict" class="warn"><div class="h">正在检测…</div><div id="verdict-body">请稍候</div></div>
+
+  <div class="card">
+    <h2>环境</h2>
+    <div id="env"></div>
+  </div>
+  <div class="card">
+    <h2>IndexedDB（截图的主通道）</h2>
+    <div id="idb"></div>
+  </div>
+  <div class="card">
+    <h2>localStorage（备用通道）</h2>
+    <div id="ls"></div>
+  </div>
+
+  <button onclick="run()">重新检测</button>
+  <span class="hint">检测完按下面建议处理，再回到工作台重新导入投稿即可带上截图。</span>
+</div>
+
+<script>
+function el(id){return document.getElementById(id);}
+function row(k,v,cls){
+  return '<div class="row"><span class="k">'+k+'</span><span class="v">'+(cls?'<span class="tag '+cls+'">'+v+'</span>':v)+'</span></div>';
+}
+function esc(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+
+/* ---------- IndexedDB 检测（含 8 秒挂起判定） ---------- */
+function probeIDB(){
+  return new Promise(function(resolve){
+    var r = {has:typeof indexedDB!=='undefined', open:false, write:false, read:false, errName:'', errMsg:'', ms:0};
+    var t0 = Date.now();
+    if(!r.has){ r.errName='NoIndexedDB'; r.errMsg='浏览器没有 indexedDB 对象'; return resolve(r); }
+    var req, settled=false;
+    try{ req = indexedDB.open('nxgd_files',1); }catch(e){
+      r.errName=(e&&e.name)||'SecurityError'; r.errMsg=(e&&e.message)||'open 直接抛错'; return resolve(r);
+    }
+    var timer = setTimeout(function(){
+      if(settled) return; settled=true;
+      r.errName='Timeout'; r.errMsg='打开数据库 8 秒无响应（多半被浏览器策略拦截/挂起）'; r.ms=Date.now()-t0; resolve(r);
+    },8000);
+    req.onupgradeneeded = function(){ req.result.createObjectStore('files',{keyPath:'id'}); };
+    req.onerror = function(){ if(settled)return; settled=true; clearTimeout(timer);
+      var e=req.error||{}; r.errName=e.name||'Error'; r.errMsg=e.message||'打开失败'; r.ms=Date.now()-t0; resolve(r); };
+    req.onblocked = function(){ if(settled)return; settled=true; clearTimeout(timer);
+      r.errName='Blocked'; r.errMsg='另一个标签页占用着旧版本数据库'; r.ms=Date.now()-t0; resolve(r); };
+    req.onsuccess = function(){
+      if(settled)return; settled=true; clearTimeout(timer);
+      r.open=true; r.ms=Date.now()-t0;
+      var db=req.result, tid='__diag__'+Date.now();
+      var tx;
+      try{ tx=db.transaction('files','readwrite'); }catch(e){
+        r.errName=(e&&e.name)||'Error'; r.errMsg=(e&&e.message)||'无法创建事务'; return resolve(r);
+      }
+      tx.objectStore('files').put({id:tid,data:'diag'});
+      tx.oncomplete=function(){
+        r.write=true;
+        var tx2=db.transaction('files','readonly');
+        var g=tx2.objectStore('files').get(tid);
+        g.onsuccess=function(){ r.read = !!(g.result && g.result.data==='diag');
+          var tx3=db.transaction('files','readwrite'); tx3.objectStore('files').delete(tid); resolve(r); };
+        g.onerror=function(){ resolve(r); };
+      };
+      tx.onerror=function(){ var e=tx.error||{}; r.errName=e.name||'Error'; r.errMsg=e.message||'写入失败'; resolve(r); };
+    };
+  });
+}
+
+/* ---------- localStorage 检测 ---------- */
+function probeLS(){
+  var o={ok:false,used:0,files:0,err:''};
+  try{
+    localStorage.setItem('__diag__','1'); localStorage.removeItem('__diag__'); o.ok=true;
+  }catch(e){ o.err=(e&&e.name)||'Error'; return o; }
+  try{
+    for(var i=0;i<localStorage.length;i++){
+      var k=localStorage.key(i);
+      if(!k) continue;
+      o.used += k.length + (localStorage.getItem(k)||'').length;
+      if(k.indexOf('nxgd_file_')===0) o.files++;
+    }
+  }catch(e){}
+  return o;
+}
+
+function fmt(n){ n=Number(n)||0; return n<1024? n+' B' : n<1048576? (n/1024).toFixed(1)+' KB' : (n/1048576).toFixed(2)+' MB'; }
+
+function run(){
+  el('verdict').className='warn'; el('verdict').querySelector('.h').textContent='正在检测…';
+  el('verdict-body').textContent='请稍候';
+  el('env').innerHTML=''; el('idb').innerHTML=''; el('ls').innerHTML='';
+
+  var ua = navigator.userAgent;
+  var browser = /Edg\//.test(ua)?'Edge':/Chrome\//.test(ua)?'Chrome':/Firefox\//.test(ua)?'Firefox':/Version\/.*Safari/.test(ua)?'Safari':'其它';
+  el('env').innerHTML =
+    row('浏览器', browser) +
+    row('访问地址', location.protocol+'//'+location.host) +
+    row('是否安全上下文', window.isSecureContext?'是':'否', window.isSecureContext?'t-ok':'t-warn');
+
+  var ls = probeLS();
+  var est = {quota:0, usage:0};
+  var estP = (navigator.storage && navigator.storage.estimate)
+    ? navigator.storage.estimate().then(function(e){ est.quota=e.quota||0; est.usage=e.usage||0; }).catch(function(){})
+    : Promise.resolve();
+
+  estP.then(probeIDB).then(function(r){
+    /* ---- IndexedDB 面板 ---- */
+    var h='';
+    h += row('indexedDB 存在', r.has?'是':'否', r.has?'t-ok':'t-err');
+    h += row('数据库可打开', r.open?'成功（'+r.ms+'ms）':'失败', r.open?'t-ok':'t-err');
+    h += row('写入测试', r.write?'通过':'未通过', r.write?'t-ok':'t-err');
+    h += row('读回测试', r.read?'通过':'未通过', r.read?'t-ok':'t-err');
+    if(r.errName) h += row('错误类型', esc(r.errName)+' · '+esc(r.errMsg));
+    el('idb').innerHTML=h;
+
+    /* ---- localStorage 面板 ---- */
+    var l='';
+    l += row('可读写', ls.ok?'正常':'不可用 '+esc(ls.err), ls.ok?'t-ok':'t-err');
+    l += row('已占用（字符）', ls.used.toLocaleString()+' 字符 ≈ '+(ls.used*2/1048576).toFixed(2)+' MB');
+    if(est.quota) l += row('浏览器配额', fmt(est.quota)+'（已用 '+fmt(est.usage)+'）');
+    l += row('备用通道里的截图', ls.files+' 张', ls.files?'t-warn':'t-ok');
+    el('ls').innerHTML=l;
+
+    /* ---- 结论 ---- */
+    var v=el('verdict'), b=el('verdict-body');
+    if(r.open && r.write && r.read){
+      v.className='ok'; v.querySelector('.h').textContent='✅ 存储正常，截图能正常保存';
+      b.innerHTML = 'IndexedDB 读写都通过。工作台导入同事投稿时会把截图存到这里。'+
+        (ls.files? ' 注意：有 '+ls.files+' 张截图目前存放在备用通道（localStorage），建议在这台电脑上重新导入一次投稿，让它们回到主通道。':'');
+      return;
+    }
+    v.className='err'; v.querySelector('.h').textContent='❌ IndexedDB 不可用，截图会被丢弃（文字信息照常导入）';
+    var steps='';
+    if(r.errName==='Blocked'){
+      steps='<ol><li>把其它打开着工作台的标签页全部关掉（尤其是老版本页面）</li><li>回到本页面点「重新检测」，直到显示存储正常</li></ol>';
+    }else{
+      steps='<ol>'+
+        '<li><b>换普通窗口</b>：无痕/隐私窗口下部分浏览器禁用存储 —— 用普通窗口打开 <code>'+location.protocol+'//'+location.host+'</code></li>'+
+        '<li><b>允许站点数据</b>：地址栏左侧锁图标 → 站点设置 → Cookie 和站点数据 → 选「允许」；同时确认系统设置里没有勾「阻止第三方 Cookie / 关闭浏览器时清除数据」</li>'+
+        '<li><b>不要用兼容模式</b>：确认是 Chrome / Edge 最新版，不是 IE 内核或极速/兼容模式</li>'+
+        '<li><b>确认是网页不是本地文件</b>：地址应以 <code>http://</code> 开头，不要双击 html 用 <code>file://</code> 打开</li>'+
+        '<li>改完点上面「重新检测」；显示存储正常后，回工作台重新导入投稿即可带上截图</li>'+
+      '</ol>';
+    }
+    b.innerHTML='失败原因：<b>'+esc(r.errName||'未知')+'</b> —— '+esc(r.errMsg||'')+'<br>已启用备用通道：'+
+      (ls.ok? '可用，但空间有限，装不下的图仍会丢弃。':'不可用。')+steps;
+  });
+}
+run();
+</script>
+</body>
+</html>
