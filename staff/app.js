@@ -2729,7 +2729,7 @@
     groups.push({ name: '到期待发货订单', items: orders.filter(function (o) { return (o.status === '待发货') && util.daysBetween(o.deliverDate, today) <= 0; }).map(function (o) { return { title: o.no + ' · ' + o.customer, sub: '交货期' + util.fmtDateView(o.deliverDate) + '，需尽快发货', route: 'orders', preset: { status: '待发货' } }; }) });
     groups.push({ name: '到期待对账 / 待回款', items: recs.filter(function (r) { return r.status !== '全款结清' && r.periodDue && util.daysBetween(r.periodDue, today) <= 3; }).map(function (r) { return { title: r.no + ' · ' + r.customer, sub: '状态' + r.status + '，到期' + util.fmtDateView(r.periodDue), route: 'reconciliation' }; }) });
     groups.push({ name: '未处理售后异常', items: excs.filter(function (e) { return e.progress === '待处理' || e.progress === '处理中'; }).map(function (e) { return { title: e.type + ' · ' + (e.no || '-'), sub: e.desc, route: 'exception' }; }) });
-    if (!STAFF) groups.push({ name: '待转采购未处理', items: store.list('pendings').filter(function (p) { return p.status === '待转'; }).map(function (p) { return { title: p.no + ' · ' + p.customer, sub: p.product + ' ' + p.qty + '（来源' + (p.source || '-') + '）', route: 'pendings' }; }) });
+    groups.push({ name: '待转采购未处理', items: store.list('pendings').filter(function (p) { return p.status === '待转'; }).map(function (p) { return { title: p.no + ' · ' + p.customer, sub: p.product + ' ' + p.qty + '（来源' + (p.source || '-') + '）', route: 'pendings' }; }) });
     return groups;
   }
   function renderTodo() {
@@ -3156,10 +3156,10 @@
     backup: { title: '数据备份', render: renderBackupPanel }
   };
   /* 同事版（staff.html 注入 __NXGD_STAFF__）：
-   *   · 待转采购 —— 只留你自己用，同事连入口都没有（手敲 #/pendings 也会落到数据看板）
-   *   · 数据备份 —— 依赖本机 node server 的 /api 接口，公网静态版用不了，一并隐藏免得报错 */
+   *   · 待转采购 —— 2026-11-16 起已开放给同事（与主端双向同步，共用一份待转清单）
+   *   · 数据备份 —— 依赖本机 node server 的 /api 接口，公网静态版用不了，隐藏免得报错 */
   var STAFF = !!window.__NXGD_STAFF__;
-  if (STAFF) { delete ROUTES.pendings; delete ROUTES.backup; }
+  if (STAFF) { delete ROUTES.backup; }
   // 每个模块独立记忆自己的滚动位置，杜绝「滚动A模块、B模块也跟着滑」的联动问题
   var _routeScroll = {};
   var _curRoute = null;
