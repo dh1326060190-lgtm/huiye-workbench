@@ -23,7 +23,11 @@
   var MODULES = ['customers', 'orders', 'productions', 'shipments', 'noships',
                  'returns', 'reconciliations', 'exceptions', 'memos'];
 
-  var CFG_KEY = 'nxgd_sync_cfg';
+  // ⚠️ 绝不能带 nxgd_ 前缀：store.js 会把所有 nxgd_ 前缀的 key 当成业务模块，
+  //    在 _loadCache 里 fallback JSON.parse 吞进 _cache，再被 _flushAll 加密落盘覆盖，
+  //    导致下次打开 loadCfg 读到密文解析失败 → 团队名/口令/设备号全部丢失（2026-10-13 修）
+  var CFG_KEY = 'wb_sync_cfg';
+  var LEGACY_CFG_KEY = 'nxgd_sync_cfg';   // 旧 key，仅用于一次性迁移
   var PULL_MS = 20000;        // 自动拉取间隔
   var PUSH_DEBOUNCE = 1200;   // 改动后多久推一次（合并连续编辑）
   var SALT_PREFIX = 'nxgd-team-v1:';
@@ -54,13 +58,34 @@
   function store() { return global.WB && global.WB.store; }
   function rid(n) { var s = '', c = 'abcdefghijklmnopqrstuvwxyz0123456789'; for (var i = 0; i < (n || 6); i++) s += c[Math.floor(Math.random() * c.length)]; return s; }
 
+  function defCfg() { return { on: false, team: '', pass: '', device: rid(5), lastPull: 0 }; }
+  function normalize(o, fallback) {
+    return { on: !!o.on, team: o.team || '', pass: o.pass || '',
+             device: o.device || (fallback && fallback.device) || rid(5), lastPull: o.lastPull || 0 };
+  }
   function loadCfg() {
     try {
       var raw = localStorage.getItem(CFG_KEY);
-      if (!raw) return { on: false, team: '', pass: '', device: rid(5), lastPull: 0 };
-      var o = JSON.parse(raw);
-      return { on: !!o.on, team: o.team || '', pass: o.pass || '', device: o.device || rid(5), lastPull: o.lastPull || 0 };
-    } catch (e) { return { on: false, team: '', pass: '', device: rid(5), lastPull: 0 }; }
+      if (raw) {
+        var o = JSON.parse(raw);                 // 新 key：我们自己的纯 JSON，必然可解析
+        return normalize(o, null);
+      }
+      // 一次性迁移：老版本配置存在 nxgd_sync_cfg；若它已被 store.js 加密则解析失败，只能丢弃
+      var old = localStorage.getItem(LEGACY_CFG_KEY);
+      if (old) {
+        try {
+          var oo = JSON.parse(old);
+          if (oo && (oo.team || oo.pass || oo.device)) {
+            var mig = normalize(oo, null);
+            try { localStorage.setItem(CFG_KEY, JSON.stringify(mig)); } catch (e3) {}
+            try { localStorage.removeItem(LEGACY_CFG_KEY); } catch (e4) {}
+            return mig;
+          }
+        } catch (e2) { /* 已被 store 加密，内容不可用 */ }
+        try { localStorage.removeItem(LEGACY_CFG_KEY); } catch (e5) {}   // 清掉脏 key，别再被 store 当数据模块
+      }
+      return defCfg();
+    } catch (e) { return defCfg(); }
   }
   function saveCfg() {
     try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) {}
@@ -104,9 +129,9 @@
     return h;
   }
   function pullRemote(since) {
+    // 小团队数据量（几百条）直接全量拉，避免「上次失败拉取把 lastPull 顶到最新 → 改对口令后只查到 0 条」的毒化问题
     var url = BASE + '/rest/v1/' + TABLE +
       '?team=eq.' + encodeURIComponent(cfg.team) +
-      '&updated_at=gt.' + (since || 0) +
       '&select=rec_id,module,payload,updated_at,deleted' +
       '&order=updated_at.asc&limit=1000' +
       '&apikey=' + encodeURIComponent(ANON);
@@ -126,21 +151,30 @@
   function applyRemote(rows) {
     var st = store(); if (!st) return [];
     var touched = {};
+    // ⚠️ 必须先在本机数组「副本」上操作，最后整份 save：
+    //   st.list(m) 在某模块本地尚无数据时返回的是 def（新数组），不是缓存引用；
+    //   若直接 unshift 到它，再 save(st.list(m)) 会拿到另一个新数组 → 拉回的数据凭空消失
+    //   （旧库因本地已有该模块数组而看似正常，新设备首次拉取必然丢数据）。
+    var bufs = {};
+    function buf(m) {
+      if (!bufs[m]) bufs[m] = st.list(m).slice();
+      return bufs[m];
+    }
     rows.forEach(function (r) {
       if (MODULES.indexOf(r.module) < 0) return;
       var m = r.module, id = r.rec_id;
       pushed[m] = pushed[m] || {};
+      var arr = buf(m);
       if (r.deleted) {
-        var arr0 = st.list(m);
         var i0 = -1;
-        for (var k = 0; k < arr0.length; k++) { if (arr0[k].id === id) { i0 = k; break; } }
-        if (i0 >= 0) { arr0.splice(i0, 1); touched[m] = true; }
+        for (var k = 0; k < arr.length; k++) { if (arr[k].id === id) { i0 = k; break; } }
+        if (i0 >= 0) { arr.splice(i0, 1); touched[m] = true; }
         delete pushed[m][id];                       // 别再把它当墓碑推回去
         return;
       }
-      var obj = decPayload(r.payload);
+      var obj = r._obj;                             // ⚠️ 用 pull 预先解密好的结果：decPayload 是异步的，若当同步调用会拿到 Promise，obj.id 恒为 undefined → 每条都被误判「解不开」丢弃
       if (!obj || !obj.id) return;                  // 口令不对解不开 → 跳过
-      var arr = st.list(m), idx = -1, j;
+      var idx = -1, j;
       for (j = 0; j < arr.length; j++) { if (arr[j].id === obj.id) { idx = j; break; } }
       if (idx < 0) { arr.unshift(obj); touched[m] = true; pushed[m][id] = r.updated_at; }
       else {
@@ -150,7 +184,7 @@
       }
     });
     var names = Object.keys(touched);
-    names.forEach(function (m) { st.save(m, st.list(m), { remote: true }); });
+    names.forEach(function (m) { st.save(m, bufs[m], { remote: true }); });
     return names;
   }
 
@@ -170,6 +204,14 @@
           cfg.lastPull = maxAt; saveCfg();
           state.lastPull = Date.now();
           state.remoteCount = rows.length;
+          // 拉到数据但一条都解不开 → 多半是团队口令不一致（静默跳过会让人误以为没数据）
+          var fail = 0;
+          rows.forEach(function (r) { if (!r._obj) fail++; });
+          if (rows.length && fail === rows.length) {
+            state.lastError = '拉到 ' + rows.length + ' 条数据但全部解密失败，团队口令可能不一致';
+            if (isManual && global.ui && global.ui.toast) global.ui.toast(state.lastError, 'err');
+            return 0;
+          }
           state.lastError = '';
           if (names.length && global.__NXGD_REFRESH__) { try { global.__NXGD_REFRESH__(); } catch (e) {} }
           if (isManual && global.ui && global.ui.toast) global.ui.toast('已同步' + (names.length ? '，更新 ' + names.length + ' 个模块' : '，没有新改动'), 'ok');
@@ -269,17 +311,30 @@
   }
   function onVis() { if (!document.hidden) pull(false); }
 
+  /* 同步指纹：把「团队名|口令」压缩成 8 位码，用户和同事各看一眼是否相同，
+     就能 100% 确认两边填的口令一字不差（含空格/全半角等不可见差异也能揪出） */
+  function fp(s) {
+    var h = 0x811c9dc5, i;
+    s = String(s || '');
+    for (i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
+    return ('0000000' + h.toString(16)).slice(-8);
+  }
+
   var api = {
     MODULES: MODULES,
-    getCfg: function () { return { on: cfg.on, team: cfg.team, hasPass: !!cfg.pass, device: cfg.device }; },
+    getCfg: function () { return { on: cfg.on, team: cfg.team, hasPass: !!cfg.pass, fp: cfg.fp, device: cfg.device }; },
     getState: function () { return state; },
     isOn: function () { return state.on; },
+    /* 当前配置的指纹（团队名|口令），用于和同事比对是否一致 */
+    fingerprintOf: function (team, pass) { return fp((team || '') + '|' + (pass || '')); },
     /* 启用：team 团队名、pass 团队口令（两边填一样的才能互相解开） */
     enable: function (team, pass) {
       team = (team || '').trim(); pass = pass || '';
       if (!team) return Promise.reject(new Error('请填团队名'));
       if (pass.length < 4) return Promise.reject(new Error('团队口令至少 4 位'));
       cfg.team = team; cfg.pass = pass; cfg.on = true;
+      cfg.lastPull = 0;                               // 每次开启都全量重拉，避开「上次失败拉取毒化了 lastPull」
+      cfg.fp = fp(team + '|' + pass);                 // 记下指纹，便于和同事比对
       keyCache = null; keyFor = null; pushed = {};
       saveCfg();
       start();
