@@ -7,7 +7,7 @@
  *
  * 三条硬规矩：
  *  1. 上云前先用「团队口令」加密 —— Supabase 只看到密文，不知道口令就解不开；
- *  2. 待转采购(pendings) 永不上传 —— 那块只留你自己电脑；
+ *  2. 待转采购(pendings) 也参与同步 —— 主端/同事端共用一份待转清单；
  *  3. 默认关闭 —— 不启用就跟以前一模一样，单机照常用。
  *
  * 冲突：同一条记录以「修改时间新的」为准（谁最后改的听谁的）。
@@ -19,9 +19,9 @@
   var ANON = SB.anon || '';
   var TABLE = 'wb_sync';
 
-  /* 参与同步的集合；pendings（待转采购）刻意不在里面 */
+  /* 参与同步的集合（含 pendings 待转采购，2026-11-16 起与主端一致，同事可见待转） */
   var MODULES = ['customers', 'orders', 'productions', 'shipments', 'noships',
-                 'returns', 'reconciliations', 'exceptions', 'memos'];
+                 'returns', 'reconciliations', 'exceptions', 'memos', 'pendings'];
 
   // ⚠️ 绝不能带 nxgd_ 前缀：store.js 会把所有 nxgd_ 前缀的 key 当成业务模块，
   //    在 _loadCache 里 fallback JSON.parse 吞进 _cache，再被 _flushAll 加密落盘覆盖，

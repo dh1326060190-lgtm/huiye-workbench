@@ -3009,7 +3009,7 @@
         '<button class="btn danger" data-act="clear">清空全部数据</button>' +
         '</div>') +
       panel('团队同步（和同事共用一份数据）', '', '<div style="padding:6px 0">' +
-        '<p style="margin-bottom:8px;color:#7a8699">你和你同事填<b>同一个团队名 + 同一个团队口令</b>，两边就能互相看到订单、客户、生产、发货等模块的改动（约 20 秒自动同步一次，同一条记录以最后修改的为准）。<b>待转采购不会上传</b>，永远只留在你自己这台电脑。数据上传前已用团队口令加密，云端只存密文。</p>' +
+        '<p style="margin-bottom:8px;color:#7a8699">你和你同事填<b>同一个团队名 + 同一个团队口令</b>，两边就能互相看到订单、客户、生产、发货、<b>待转采购</b>等模块的改动（约 20 秒自动同步一次，同一条记录以最后修改的为准）。数据上传前已用团队口令加密，云端只存密文。</p>' +
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">' +
         '<input class="input" id="syncTeam" placeholder="团队名（例如：纽扣内销）">' +
         '<input class="input" id="syncPass" type="password" placeholder="团队口令（至少 4 位，同事填一样的）"></div>' +
